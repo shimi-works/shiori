@@ -1,0 +1,470 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>栞 — AI文豪コンシェルジュ / 技術説明・設計思想</title>
+<meta name="description" content="青空文庫の名作を読む・理解する・記録するまで一つで完結させる読書Webアプリ 栞 の技術説明・設計思想。単一HTML・AI連携・PWA。">
+</head>
+<body>
+<style>
+  :root{
+    --bg:#EAE6DC; --surface:#FBF9F3; --surface-2:#F1ECE1;
+    --ink:#211D17; --muted:#6C6353; --faint:#8B8170; --line:#DAD2C2;
+    --accent:#9A4B3F; --accent-2:#B5862F; --glow:rgba(154,75,63,.13);
+    --code-bg:#221C15; --code-ink:#ECE3D1;
+    --font-sans: system-ui,-apple-system,"Segoe UI","Hiragino Kaku Gothic ProN","Yu Gothic UI",Meiryo,sans-serif;
+    --font-mincho:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Noto Serif JP","MS PMincho",serif;
+    --font-mono: ui-monospace,"SF Mono","Cascadia Code","JetBrains Mono",Consolas,monospace;
+    --maxw:940px; --r:16px;
+  }
+  @media (prefers-color-scheme:dark){
+    :root{
+      --bg:#14110C; --surface:#1C1813; --surface-2:#17130E;
+      --ink:#EAE1CE; --muted:#A99E86; --faint:#7E7360; --line:#2C2820;
+      --accent:#D98A6A; --accent-2:#D3AD5A; --glow:rgba(217,138,106,.16);
+      --code-bg:#0E0B07; --code-ink:#E4DAC6;
+    }
+  }
+  :root[data-theme="light"]{ --bg:#EAE6DC; --surface:#FBF9F3; --surface-2:#F1ECE1; --ink:#211D17; --muted:#6C6353; --faint:#8B8170; --line:#DAD2C2; --accent:#9A4B3F; --accent-2:#B5862F; --glow:rgba(154,75,63,.13); --code-bg:#221C15; --code-ink:#ECE3D1; }
+  :root[data-theme="dark"]{ --bg:#14110C; --surface:#1C1813; --surface-2:#17130E; --ink:#EAE1CE; --muted:#A99E86; --faint:#7E7360; --line:#2C2820; --accent:#D98A6A; --accent-2:#D3AD5A; --glow:rgba(217,138,106,.16); --code-bg:#0E0B07; --code-ink:#E4DAC6; }
+
+  *{box-sizing:border-box}
+  body{ margin:0; background:var(--bg); color:var(--ink); font-family:var(--font-sans);
+    font-size:1.0625rem; line-height:1.72; -webkit-font-smoothing:antialiased; overflow-x:hidden; }
+  .wrap{ max-width:var(--maxw); margin:0 auto; padding:0 22px; }
+  a{ color:var(--accent); text-underline-offset:3px; }
+
+  .eyebrow{ font-family:var(--font-mono); font-size:.72rem; letter-spacing:.18em; text-transform:uppercase;
+    color:var(--accent); margin:0 0 .5rem; font-weight:600; }
+  h1,h2,h3{ text-wrap:balance; line-height:1.14; letter-spacing:-.01em; }
+  h2{ font-size:clamp(1.5rem,3.3vw,2.05rem); font-weight:800; margin:0 0 .35rem; }
+  h3{ font-size:1.12rem; font-weight:700; margin:0 0 .3rem; }
+  p{ margin:0 0 1rem; }
+  .lead{ color:var(--muted); }
+  b{ font-weight:650; }
+
+  /* ---------- HERO ---------- */
+  .hero{ position:relative; border-bottom:1px solid var(--line); overflow:hidden;
+    background: radial-gradient(120% 90% at 86% -12%, var(--glow), transparent 60%), var(--surface-2); }
+  .hero::before{ content:""; position:absolute; inset:0; pointer-events:none;
+    background: repeating-linear-gradient(180deg, rgba(140,120,80,.05) 0 1px, transparent 1px 9px); }
+  .hero-inner{ position:relative; display:grid; grid-template-columns:1.05fr .95fr; gap:40px; align-items:center;
+    padding:clamp(46px,8vw,88px) 0 clamp(38px,6vw,66px); }
+  @media (max-width:800px){ .hero-inner{ grid-template-columns:1fr; gap:30px; } }
+  .brand-line{ display:flex; align-items:baseline; gap:14px; }
+  .brand-glyph{ font-family:var(--font-mincho); font-weight:600; font-size:clamp(3rem,9vw,5rem); line-height:.9;
+    background:linear-gradient(150deg,var(--accent-2),var(--accent)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hero h1{ font-size:clamp(1.7rem,4.6vw,2.7rem); font-weight:850; margin:0; }
+  .hero h1 .accent{ background:linear-gradient(100deg,var(--accent-2),var(--accent)); -webkit-background-clip:text; background-clip:text; color:transparent; }
+  .hero .lead{ font-size:1.06rem; max-width:40ch; margin-top:18px; }
+  .meta-row{ display:flex; flex-wrap:wrap; gap:8px; margin-top:20px; }
+  .chip{ font-family:var(--font-mono); font-size:.72rem; letter-spacing:.02em; padding:5px 11px;
+    border:1px solid var(--line); border-radius:999px; color:var(--muted); background:var(--surface); }
+  .cta-row{ display:flex; gap:12px; margin-top:24px; flex-wrap:wrap; }
+  .btn{ display:inline-flex; align-items:center; gap:8px; font-size:.92rem; font-weight:600; padding:11px 18px;
+    border-radius:12px; text-decoration:none; }
+  .btn.primary{ background:var(--accent); color:#fff; }
+  .btn.ghost{ border:1px solid var(--line); color:var(--ink); background:var(--surface); }
+
+  /* ---------- 実演デモ（縦書きリーダー） ---------- */
+  .demo{ display:flex; flex-direction:column; gap:12px; }
+  .stage{ position:relative; aspect-ratio:3/4; border-radius:20px; overflow:hidden; border:1px solid var(--line);
+    box-shadow:0 18px 50px -24px rgba(40,28,10,.5); background:var(--surface); }
+  .rdr{ position:absolute; inset:0; padding:30px 34px 26px; writing-mode:vertical-rl; -webkit-writing-mode:vertical-rl;
+    font-family:var(--font-mincho); font-size:20px; line-height:2.0; color:var(--ink); text-align:justify; }
+  .rdr .rdr-title{ font-size:1.35em; font-weight:600; margin-right:.4em; }
+  .rdr .rdr-author{ font-size:.72em; color:var(--muted); margin-right:1.4em; }
+  .rdr rt{ font-size:.55em; color:var(--muted); transition:opacity .25s; }
+  .rdr:not(.showruby) rt{ opacity:0; }
+  .rdr .word{ cursor:pointer; border-radius:3px; background:linear-gradient(0deg,var(--glow),var(--glow)); box-shadow:0 0 0 2px var(--glow); }
+  .selpop{ position:absolute; z-index:5; transform:translate(-50%,-108%); display:flex; gap:2px; background:var(--ink);
+    border-radius:11px; padding:4px; box-shadow:0 10px 26px -10px rgba(0,0,0,.55); white-space:nowrap; }
+  .selpop.hidden{ display:none; }
+  .selpop button{ border:0; background:transparent; color:#fff; font-size:12.5px; padding:7px 9px; border-radius:7px; cursor:pointer; }
+  .selpop button:hover{ background:rgba(255,255,255,.16); }
+  .stage-cap{ position:absolute; top:12px; left:0; right:0; text-align:center; font-family:var(--font-mono);
+    font-size:.66rem; letter-spacing:.06em; color:var(--faint); pointer-events:none; transition:opacity .4s; }
+  .readouts{ display:grid; grid-template-columns:repeat(3,1fr); gap:8px; }
+  .ro{ background:var(--surface); border:1px solid var(--line); border-radius:10px; padding:8px 10px; }
+  .ro b{ display:block; font-family:var(--font-mono); font-size:1.0rem; font-variant-numeric:tabular-nums; }
+  .ro small{ color:var(--faint); font-size:.66rem; letter-spacing:.03em; }
+  .toggle-row{ display:flex; gap:8px; align-items:center; }
+  .seg{ display:inline-flex; border:1px solid var(--line); border-radius:999px; overflow:hidden; background:var(--surface); }
+  .seg button{ font-family:var(--font-mono); font-size:.74rem; padding:6px 14px; border:0; background:transparent; color:var(--muted); cursor:pointer; }
+  .seg button[aria-pressed="true"]{ background:var(--accent); color:#fff; }
+  .seg-label{ font-size:.78rem; color:var(--faint); }
+
+  /* ---------- SECTIONS ---------- */
+  section{ padding:clamp(44px,7vw,74px) 0; border-bottom:1px solid var(--line); }
+  .sec-head{ max-width:64ch; margin-bottom:30px; }
+  .sec-head .lead{ margin-bottom:0; }
+  .grid2{ display:grid; grid-template-columns:1fr 1fr; gap:18px; }
+  .grid3{ display:grid; grid-template-columns:repeat(3,1fr); gap:16px; }
+  @media (max-width:720px){ .grid2,.grid3{ grid-template-columns:1fr; } }
+  .card{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:22px; }
+  .card .num{ font-family:var(--font-mono); font-size:.74rem; color:var(--accent); letter-spacing:.1em; }
+  .card p:last-child{ margin-bottom:0; }
+
+  .code{ font-family:var(--font-mono); background:var(--code-bg); color:var(--code-ink); border-radius:10px;
+    padding:13px 15px; margin:12px 0 0; font-size:.88rem; overflow-x:auto; line-height:1.55; border:1px solid rgba(255,255,255,.06); }
+  .code .c{ color:#9b917d; } .code .k{ color:var(--accent-2); }
+
+  .figure{ background:var(--surface); border:1px solid var(--line); border-radius:var(--r); padding:18px;
+    display:grid; grid-template-columns:1.15fr 1fr; gap:20px; align-items:center; }
+  @media (max-width:640px){ .figure{ grid-template-columns:1fr; } }
+  .figure canvas{ width:100%; height:auto; display:block; }
+  .legend{ display:flex; flex-direction:column; gap:9px; font-size:.9rem; }
+  .legend span{ display:inline-flex; align-items:center; gap:8px; color:var(--muted); }
+  .dot{ width:11px; height:11px; border-radius:50%; display:inline-block; flex:0 0 auto; }
+
+  /* AI設計の対比 */
+  .vs{ display:grid; grid-template-columns:1fr auto 1fr; gap:16px; align-items:stretch; }
+  @media (max-width:720px){ .vs{ grid-template-columns:1fr; } }
+  .flowbox{ border:1px solid var(--line); border-radius:14px; padding:18px; background:var(--surface); }
+  .flowbox.good{ border-color:var(--accent); background:linear-gradient(0deg,var(--glow),transparent); }
+  .flowbox .tag{ font-family:var(--font-mono); font-size:.68rem; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); }
+  .flowbox .steps{ display:flex; flex-direction:column; gap:7px; margin-top:10px; font-size:.92rem; }
+  .flowbox .steps i{ font-style:normal; padding:7px 11px; border:1px solid var(--line); border-radius:9px; background:var(--bg); }
+  .flowbox .steps .arw{ border:0; text-align:center; color:var(--faint); font-family:var(--font-mono); font-size:.72rem; padding:1px; }
+  .flowbox .note{ font-size:.82rem; color:var(--muted); margin-top:11px; }
+  .vs .mid{ align-self:center; color:var(--faint); font-family:var(--font-mono); font-size:.8rem; text-align:center; }
+
+  ul.clean{ margin:0; padding-left:1.1em; } ul.clean li{ margin-bottom:.5rem; color:var(--muted); }
+  ul.clean li b{ color:var(--ink); }
+
+  .footer{ padding:38px 0 56px; color:var(--faint); font-size:.85rem; font-family:var(--font-mono); letter-spacing:.03em; }
+  .footer .wrap{ display:flex; justify-content:space-between; flex-wrap:wrap; gap:10px; align-items:center; }
+
+  .reveal{ opacity:0; transform:translateY(14px); transition:opacity .7s ease, transform .7s ease; }
+  .reveal.in{ opacity:1; transform:none; }
+  @media (prefers-reduced-motion:reduce){ .reveal{ opacity:1; transform:none; transition:none; } }
+  :focus-visible{ outline:2px solid var(--accent); outline-offset:2px; border-radius:4px; }
+</style>
+
+<header class="hero">
+  <div class="wrap hero-inner">
+    <div>
+      <p class="eyebrow">青空文庫 × AI ・ 単一HTML / PWA</p>
+      <div class="brand-line">
+        <span class="brand-glyph">栞</span>
+        <h1>AI文豪<br><span class="accent">コンシェルジュ</span></h1>
+      </div>
+      <p class="lead">
+        青空文庫の名作を「<b>読む → 理解する → 考える → 記録する → 次に出会う</b>」まで
+        ひとつで完結させる読書アプリ。単なるビューアではなく、
+        <b>“理解しながら読む”環境</b>を、フレームワークなしの単一HTMLで実装した。
+      </p>
+      <div class="meta-row">
+        <span class="chip">HTML / CSS / JS（単一ファイル）</span>
+        <span class="chip">OpenAI API</span>
+        <span class="chip">kuromoji.js</span>
+        <span class="chip">Web Worker</span>
+        <span class="chip">PWA</span>
+        <span class="chip">個人開発</span>
+      </div>
+      <div class="cta-row">
+        <a class="btn primary" href="https://aozora-shiori.netlify.app" target="_blank" rel="noopener">アプリを開く ↗</a>
+        <a class="btn ghost" href="#how">仕組みを見る</a>
+      </div>
+    </div>
+
+    <!-- 実演デモ -->
+    <div class="demo">
+      <div class="stage" role="img" aria-label="縦書き・ふりがな・語句を選択して質問できるリーダーのデモ">
+        <div class="rdr showruby" id="rdr">
+          <div class="rdr-title"><ruby>羅生門<rt>らしょうもん</rt></ruby></div>
+          <div class="rdr-author">芥川龍之介</div>
+          <p>ある<ruby>日<rt>ひ</rt></ruby>の<ruby>暮方<rt>くれがた</rt></ruby>の<ruby>事<rt>こと</rt></ruby>である。<ruby>一人<rt>ひとり</rt></ruby>の<span class="word" id="wordGenin"><ruby>下人<rt>げにん</rt></ruby></span>が、<ruby>羅生門<rt>らしょうもん</rt></ruby>の<ruby>下<rt>した</rt></ruby>で<ruby>雨<rt>あま</rt></ruby>やみを<ruby>待<rt>ま</rt></ruby>っていた。</p>
+        </div>
+        <div class="selpop hidden" id="selpop">
+          <button>📖 辞書</button><button>💬 AIに聞く</button><button>🖍 ハイライト</button>
+        </div>
+        <div class="stage-cap" id="stageCap">「下人」をタップ →</div>
+      </div>
+      <div class="readouts">
+        <div class="ro"><b>●●○○○</b><small>難易度 気軽</small></div>
+        <div class="ro"><b>13分</b><small>読了目安</small></div>
+        <div class="ro"><b>縦書き</b><small>ルビ・外字対応</small></div>
+      </div>
+      <div class="toggle-row">
+        <span class="seg-label">ふりがな：</span>
+        <span class="seg" role="group" aria-label="ふりがな切替">
+          <button id="rbOn" aria-pressed="true">ON</button>
+          <button id="rbOff" aria-pressed="false">OFF</button>
+        </span>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <!-- 概要 -->
+  <section id="overview">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Overview</p>
+        <h2>何を、なぜ作ったか</h2>
+        <p class="lead">青空文庫のリーダーは数多いが、その多くは「読む」だけで「理解」を助けない。
+          そして名作が多すぎて、初心者ほど「どれを読めばいいか分からない」。この2つを解く。</p>
+      </div>
+      <div class="grid3">
+        <div class="card reveal">
+          <p class="num">課題</p>
+          <h3>「読む」から「理解」へ</h3>
+          <p>難語はその場で辞書やAIに聞け、本文を選択して質問できる。読書を止めずに、分からなさをその場で解消する。</p>
+        </div>
+        <div class="card reveal">
+          <p class="num">アプローチ</p>
+          <h3>体験を一つに束ねる</h3>
+          <p>読む・調べる・ハイライト・感想・レコメンドを別々の機能でなく、
+             <b>ひとつの読書体験</b>として統合。UIは縦書きに馴染む「選択して操作」で貫いた。</p>
+        </div>
+        <div class="card reveal">
+          <p class="num">到達点</p>
+          <h3>131作品・全機能を単一HTMLで</h3>
+          <p>収録131作品すべてに手書きあらすじと実測難易度を用意。依存ゼロ・ビルド不要で公開し、PWAとしてオフライン読書にも対応。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 仕組み -->
+  <section id="how">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">How it works</p>
+        <h2>ブラウザの中で、本を組み立てる</h2>
+        <p class="lead">サーバーを持たず、青空文庫の原文を取得して縦書きの本にする。各所に一つずつ設計判断がある。</p>
+      </div>
+
+      <div class="grid2">
+        <div class="card reveal">
+          <p class="num">01 — データ取得</p>
+          <h3>Shift_JIS の原文を、ブラウザで組版</h3>
+          <p>青空文庫のXHTMLをGitHubミラーから取得（CORS対応）。文字コードはブラウザ側でデコードし、
+             縦書きとルビは<b>ブラウザ標準機能</b>で表現する。外字画像はURLを絶対化。</p>
+          <div class="code">
+res  = <span class="k">await</span> fetch(rawUrl)         <span class="c">// GitHub raw（CORS: *）</span>
+buf  = <span class="k">await</span> res.arrayBuffer()
+text = <span class="k">new</span> TextDecoder(<span class="k">"shift_jis"</span>).decode(buf)
+<span class="c">// writing-mode: vertical-rl ＋ &lt;ruby&gt; はブラウザが描画</span></div>
+        </div>
+
+        <div class="card reveal">
+          <p class="num">02 — 難易度は“実測”</p>
+          <h3>勘ではなく、本文から数値化</h3>
+          <p>全131作品の本文を取得して計測。<b>旧仮名/旧字か・漢字率・一文の長さ</b>から難易度★を、
+             文字数から読了目安を算出する。だから「★3」より「★2・30分・はじめて向き」で選べる。</p>
+          <div class="code">
+score = w_orth·(旧仮名/旧字) + w_kanji·漢字率 + w_len·一文長
+diff  = 段階化(score) <span class="k">→</span> ★1..5   <span class="c">// 表示は●</span>
+min   = 文字数 / 450                   <span class="c">// 読了目安（分）</span></div>
+        </div>
+      </div>
+
+      <div style="height:18px"></div>
+
+      <div class="figure reveal">
+        <canvas id="scatter" width="520" height="360" aria-label="難易度と分量が独立であることを示す散布図"></canvas>
+        <div>
+          <p class="eyebrow" style="margin-bottom:.3rem">Difficulty × Length</p>
+          <h3>「難易度」と「分量」は別の軸</h3>
+          <p>言葉の読みやすさ（横）と、読み終わる時間（縦）は一致しない。
+             <b>『こころ』は言葉はやさしいが約6時間</b>、<b>『舞姫』は短いが旧字旧仮名で手強い</b>。
+             二軸で持つことで「今日は30分で、やさしいものを」という選び方ができる。</p>
+          <div class="legend" style="margin-top:12px">
+            <span><i class="dot" style="background:var(--accent-2)"></i>やさしい・入門向き</span>
+            <span><i class="dot" style="background:var(--accent)"></i>手強い（旧字・文語）</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- AI設計 -->
+  <section id="ai">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">AI as Design</p>
+        <h2>手書きあらすじを、AIに渡す</h2>
+        <p class="lead">「AIをつなぐ」だけなら誰でもできる。ここでは<b>何を文脈として渡すか</b>を設計した。
+           作品全文ではなく、自分で書いた要約を渡す——それだけで質もコストも変わる。</p>
+      </div>
+
+      <div class="vs reveal">
+        <div class="flowbox">
+          <div class="tag">ありがち</div>
+          <div class="steps">
+            <i>作品全文（数万〜数十万字）</i>
+            <span class="arw">▼</span>
+            <i>AI</i>
+          </div>
+          <div class="note">長編ほどトークンが膨らみ、高コスト・低速・要点がぼける。文脈上限も超えやすい。</div>
+        </div>
+        <div class="mid">──▶</div>
+        <div class="flowbox good">
+          <div class="tag">栞の設計</div>
+          <div class="steps">
+            <i>作品</i>
+            <span class="arw">▼ 自作の手書きあらすじ</span>
+            <i>あらすじ ＋ 選択箇所 ＋ 現在の場面</i>
+            <span class="arw">▼</span>
+            <i>AI</i>
+          </div>
+          <div class="note"><b>トークン削減・低コスト・回答品質の向上</b>を同時に実現。長編でも破綻しない。AIの特性を理解した設計。</div>
+        </div>
+      </div>
+
+      <div style="height:18px"></div>
+      <div class="grid2">
+        <div class="card reveal">
+          <p class="num">選択して質問</p>
+          <h3>全文ではなく、この一文について</h3>
+          <p>文学は「全体を要約して」より「この一節どういう意味？」の方が多い。本文をなぞって
+             <b>現代語訳／語句の意味／表現の意図／見どころ</b>、あるいは自由に質問できる。</p>
+        </div>
+        <div class="card reveal">
+          <p class="num">重い処理は別スレッドへ</p>
+          <h3>総ルビは Web Worker で</h3>
+          <p>全漢字にふりがなを振る形態素解析（kuromoji.js）はメインスレッドを止める。
+             <b>Web Workerに逃がし</b>、スマホでもUIが固まらないようにした。ふりがなは「難しい漢字だけ」に限定。</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 設計思想 -->
+  <section id="principles">
+    <div class="wrap">
+      <div class="sec-head reveal">
+        <p class="eyebrow">Design Principles</p>
+        <h2>設計思想</h2>
+        <p class="lead">機能を並べることより、「読者が何をしたいか」に馴染む体験を優先した。</p>
+      </div>
+      <div class="grid2">
+        <div class="card reveal"><p class="num">01</p><h3>体験から逆算する</h3>
+          <p>「今日は30分しかない」で本を選ぶ——その現実に合わせ、難易度と読了目安を実測して用意した。</p></div>
+        <div class="card reveal"><p class="num">02</p><h3>最小構成で作り切る</h3>
+          <p>React等を使わず単一HTMLで完結。依存ゼロ・ビルド不要。なぜその構成かを説明できる。</p></div>
+        <div class="card reveal"><p class="num">03</p><h3>実データで検証する</h3>
+          <p>難易度は131作品を実測し、作品URLもCSVから著作権フラグで抽出して一つずつ検証。勘に頼らない。</p></div>
+        <div class="card reveal"><p class="num">04</p><h3>AIを“設計”として使う</h3>
+          <p>ただ繋ぐのでなく、自作あらすじを文脈に渡してコストと品質を両立。渡すものを設計する。</p></div>
+        <div class="card reveal"><p class="num">05</p><h3>プライバシーは端末内で</h3>
+          <p>しおり・ハイライト・APIキーも外部に送らず、すべてブラウザ内に保存。バックアップの書き出しも用意。</p></div>
+        <div class="card reveal"><p class="num">06</p><h3>引き算する</h3>
+          <p>感情演出や環境音は作ったが、体験に効かないと判断して削除。足すだけでなく削る判断も設計の一部。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- スタック / 学び -->
+  <section id="stack" style="border-bottom:none">
+    <div class="wrap">
+      <div class="grid2" style="align-items:start">
+        <div class="reveal">
+          <p class="eyebrow">Tech Stack</p>
+          <h2 style="margin-bottom:16px">技術スタック</h2>
+          <div class="meta-row" style="margin-top:0">
+            <span class="chip">HTML / CSS / JavaScript</span>
+            <span class="chip">単一ファイル・ビルドなし</span>
+            <span class="chip">OpenAI API</span>
+            <span class="chip">kuromoji.js</span>
+            <span class="chip">Web Worker</span>
+            <span class="chip">Wiktionary / Wikipedia API</span>
+            <span class="chip">PWA / Service Worker</span>
+            <span class="chip">localStorage</span>
+            <span class="chip">Canvas</span>
+          </div>
+        </div>
+        <div class="reveal">
+          <p class="eyebrow">Learnings</p>
+          <h2 style="margin-bottom:16px">得られた学び</h2>
+          <ul class="clean">
+            <li><b>AIを設計対象として扱う</b>：文脈に何を渡すかで、質・コスト・速度が決まる。</li>
+            <li><b>ブラウザ標準を活かす</b>：縦書き・ルビ・文字コードをフレームなしで解決。</li>
+            <li><b>体感を数値へ翻訳する</b>：「難しい/長い」を実測指標に落とす。</li>
+            <li><b>重い処理の分離</b>：Web Workerでモバイルのフリーズを解消。</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="footer">
+  <div class="wrap">
+    <span>栞 — AI文豪コンシェルジュ / 技術説明・設計思想</span>
+    <a href="https://aozora-shiori.netlify.app" target="_blank" rel="noopener">aozora-shiori.netlify.app ↗</a>
+  </div>
+</footer>
+
+<script>
+(function(){
+  "use strict";
+  /* ふりがな切替 */
+  var rdr=document.getElementById("rdr"), on=document.getElementById("rbOn"), off=document.getElementById("rbOff");
+  function setRuby(v){ if(!rdr) return; rdr.classList.toggle("showruby", v);
+    on.setAttribute("aria-pressed", v?"true":"false"); off.setAttribute("aria-pressed", v?"false":"true"); }
+  if(on) on.addEventListener("click", function(){ setRuby(true); });
+  if(off) off.addEventListener("click", function(){ setRuby(false); });
+
+  /* 語句タップ → 選択メニュー */
+  var word=document.getElementById("wordGenin"), pop=document.getElementById("selpop"),
+      cap=document.getElementById("stageCap"), stage=word?word.closest(".stage"):null;
+  function showPop(){ if(!word||!pop||!stage) return;
+    var wr=word.getBoundingClientRect(), sr=stage.getBoundingClientRect();
+    pop.style.left=(wr.left+wr.width/2-sr.left)+"px";
+    pop.style.top=(wr.top-sr.top)+"px";
+    pop.classList.remove("hidden"); if(cap) cap.style.opacity="0"; }
+  if(word) word.addEventListener("click", function(e){ e.stopPropagation(); showPop(); });
+  document.addEventListener("click", function(e){ if(pop&&!pop.classList.contains("hidden")&&e.target!==word&&!pop.contains(e.target)) pop.classList.add("hidden"); });
+
+  /* 難易度×分量 散布図 */
+  var cv=document.getElementById("scatter");
+  var pts=[
+    {d:1,m:22,l:"走れメロス",e:1},{d:1,m:85,l:"銀河鉄道の夜",e:1},
+    {d:2,m:13,l:"羅生門",e:1},{d:2,m:356,l:"こころ",e:0},{d:2,m:708,l:"吾輩は猫である",e:0},
+    {d:3,m:161,l:"人間失格",e:0},{d:4,m:7,l:"蜜柑",e:0},
+    {d:5,m:19,l:"高瀬舟",e:0},{d:5,m:34,l:"舞姫",e:0},{d:5,m:64,l:"たけくらべ",e:0}
+  ];
+  var label={"こころ":1,"舞姫":1,"走れメロス":1,"吾輩は猫である":1};
+  function col(name){ return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+  function draw(){
+    if(!cv) return;
+    var dpr=Math.min(2,window.devicePixelRatio||1), W=cv.clientWidth||520, H=Math.round(W*0.69);
+    cv.width=W*dpr; cv.height=H*dpr; cv.style.height=H+"px";
+    var g=cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0); g.clearRect(0,0,W,H);
+    var padL=40,padR=16,padT=16,padB=30;
+    var line=col("--line"),faint=col("--faint"),accent=col("--accent"),accent2=col("--accent-2"),ink=col("--ink");
+    function X(d){ return padL+(d-1)/4*(W-padL-padR); }
+    var ymin=Math.log(6), ymax=Math.log(720);
+    function Y(m){ return (H-padB)-(Math.log(m)-ymin)/(ymax-ymin)*(H-padT-padB); }
+    g.strokeStyle=line; g.globalAlpha=.6; g.lineWidth=1;
+    for(var i=1;i<=5;i++){ g.beginPath(); g.moveTo(X(i),padT); g.lineTo(X(i),H-padB); g.stroke(); }
+    [10,30,60,180,600].forEach(function(m){ g.beginPath(); g.moveTo(padL,Y(m)); g.lineTo(W-padR,Y(m)); g.stroke(); });
+    g.globalAlpha=1; g.fillStyle=faint; g.font="10px "+col("--font-mono").replace(/"/g,"")+",monospace";
+    [[10,"10分"],[60,"1時間"],[600,"10時間"]].forEach(function(a){ g.fillText(a[1],4,Y(a[0])+3); });
+    g.fillText("易 → 難（言葉）", W-104, H-10);
+    g.save(); g.translate(11,padT+8); g.rotate(-Math.PI/2); g.fillText("← 短い　分量　長い →",-120,0); g.restore();
+    pts.forEach(function(p){
+      g.beginPath(); g.arc(X(p.d),Y(p.m),6,0,Math.PI*2);
+      g.fillStyle=p.e?accent2:accent; g.globalAlpha=.9; g.fill(); g.globalAlpha=1;
+      if(label[p.l]){ g.fillStyle=ink; g.font="11px "+"-apple-system,sans-serif";
+        var tx=X(p.d)+9, ty=Y(p.m)+4; if(tx>W-70) tx=X(p.d)-9-g.measureText(p.l).width; g.fillText(p.l,tx,ty); }
+    });
+  }
+  draw(); window.addEventListener("resize",draw);
+  if(window.matchMedia) window.matchMedia("(prefers-color-scheme:dark)").addEventListener("change",draw);
+  new MutationObserver(draw).observe(document.documentElement,{attributes:true,attributeFilter:["data-theme"]});
+
+  /* スクロール表示 */
+  if("IntersectionObserver" in window){
+    var io=new IntersectionObserver(function(es){ es.forEach(function(en){ if(en.isIntersecting){ en.target.classList.add("in"); io.unobserve(en.target); } }); },{threshold:.12});
+    document.querySelectorAll(".reveal").forEach(function(el){ io.observe(el); });
+  } else { document.querySelectorAll(".reveal").forEach(function(el){ el.classList.add("in"); }); }
+})();
+</script>
+</body>
+</html>
