@@ -4,6 +4,12 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>栞 — AI文豪コンシェルジュ</title>
+<link rel="manifest" href="./manifest.json">
+<meta name="theme-color" content="#9a4b3f">
+<link rel="apple-touch-icon" href="./icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="栞">
 <style>
   :root{
     --bg:#efe7d6; --paper:#f7f1e3; --ink:#2b2620; --sub:#7a6f5c;
@@ -59,6 +65,15 @@
   }
   .search input:focus{outline:none; border-color:var(--accent)}
   .lib-count{font-size:12.5px; color:var(--sub); margin:0 2px 20px}
+  .recos{margin:6px 0 26px}
+  .recos h2{font-size:15px; font-weight:600; letter-spacing:.06em; margin:0 0 13px; color:var(--ink)}
+  .recos .reco-row{display:flex; gap:14px; overflow-x:auto; padding-bottom:8px; scrollbar-width:thin}
+  .reco-card{flex:0 0 auto; width:212px; background:var(--paper); border:1px solid var(--line); border-radius:14px; padding:15px 16px 14px; cursor:pointer; transition:.16s}
+  .reco-card:hover{transform:translateY(-3px); border-color:var(--accent); box-shadow:0 10px 26px -18px rgba(0,0,0,.45)}
+  .reco-card .rc-title{font-size:17px; font-weight:600; letter-spacing:.04em; line-height:1.3}
+  .reco-card .rc-author{font-size:12px; color:var(--sub); margin-top:3px}
+  .reco-card .rc-reason{font-size:12px; color:var(--accent); background:color-mix(in srgb,var(--accent) 9%, transparent); border-radius:9px; padding:7px 10px; margin-top:11px; line-height:1.55}
+  .reco-card .rc-meta{font-size:11px; color:var(--sub); margin-top:10px; letter-spacing:.02em}
   .grid{display:grid; grid-template-columns:repeat(auto-fill,minmax(200px,1fr)); gap:18px}
   .card{
     position:relative; background:var(--paper); border:1px solid var(--line);
@@ -139,10 +154,87 @@
   .progress .bar{position:absolute; top:0; bottom:0; right:0; background:linear-gradient(90deg,var(--accent2),var(--accent)); border-radius:6px; width:0%}
   .pageno{font-size:12.5px; color:var(--ink); min-width:110px; text-align:center; font-variant-numeric:tabular-nums; font-weight:600}
 
-  /* ---------- floating selection tip ---------- */
-  #seltip{position:fixed; z-index:60; transform:translate(-50%,-120%); background:var(--accent); color:#fff;
-    border:none; border-radius:20px; padding:8px 14px; font-size:12.5px; box-shadow:0 8px 24px -10px rgba(0,0,0,.5)}
-  #seltip::after{content:""; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%) rotate(45deg); width:10px; height:10px; background:var(--accent)}
+  /* ---------- floating selection menu ---------- */
+  #seltip,#hltip{position:fixed; z-index:60; transform:translate(-50%,-118%); display:flex; gap:2px;
+    background:var(--ink); border-radius:12px; padding:4px; box-shadow:0 10px 28px -10px rgba(0,0,0,.6)}
+  #seltip button,#hltip button{border:none; background:transparent; color:#fff; font-size:16px; line-height:1;
+    padding:8px 10px; border-radius:8px; display:inline-flex; align-items:center; gap:5px; cursor:pointer}
+  #seltip button span,#hltip button span{font-size:11.5px; letter-spacing:.03em}
+  #seltip button:hover,#hltip button:hover{background:rgba(255,255,255,.16)}
+  #hltip button.del span{color:#ff9b8a}
+  #seltip::after,#hltip::after{content:""; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%) rotate(45deg); width:10px; height:10px; background:var(--ink)}
+
+  /* ---------- highlights (本文中のマーカー) ---------- */
+  .book mark.hl{ background:rgba(224,166,61,.42); color:inherit; border-radius:2px; cursor:pointer; }
+  .book mark.hl[data-color="pink"]{ background:rgba(200,90,110,.34); }
+  .book mark.hl[data-color="blue"]{ background:rgba(91,127,176,.34); }
+  .book mark.hl[data-color="green"]{ background:rgba(111,155,116,.36); }
+  .book mark.hl.hasnote{ box-shadow:0 2px 0 -0.5px var(--accent) inset; }
+
+  /* ---------- notes / ask panels ---------- */
+  .note-item{ border:1px solid var(--line); border-radius:12px; padding:12px 13px; margin-bottom:12px; background:var(--bg); }
+  .note-item .quote{ font-family:var(--font-serif); font-size:14px; line-height:1.7; color:var(--ink);
+    border-right:3px solid var(--accent2); padding-right:10px; margin-bottom:9px; }
+  .note-item .quote.empty{ border-color:var(--line); color:var(--sub); font-style:italic; }
+  .note-item textarea{ width:100%; border:1px solid var(--line); border-radius:9px; background:var(--paper);
+    color:var(--ink); font-family:inherit; font-size:13.5px; padding:9px 11px; resize:vertical; line-height:1.7; min-height:44px; }
+  .note-item .row{ display:flex; align-items:center; gap:8px; margin-top:8px; }
+  .note-item .row .date{ font-size:11px; color:var(--sub); }
+  .note-item .row .del{ margin-left:auto; border:1px solid var(--line); background:var(--bg); color:var(--sub);
+    border-radius:8px; padding:5px 10px; font-size:12px; cursor:pointer; }
+  .note-item .row .del:hover{ border-color:var(--accent); color:var(--accent); }
+  .swatch-row{ display:flex; gap:7px; margin-top:9px; }
+  .swatch{ width:22px; height:22px; border-radius:50%; border:2px solid transparent; cursor:pointer; }
+  .swatch.on{ border-color:var(--ink); }
+
+  .ask-quotes{ font-family:var(--font-serif); font-size:14px; line-height:1.7; color:var(--ink);
+    background:var(--bg); border-left:3px solid var(--accent2); padding:9px 12px; border-radius:8px; margin-bottom:12px; }
+  .ask-chips{ display:flex; flex-wrap:wrap; gap:7px; margin-bottom:12px; }
+  .ask-chips button{ border:1px solid var(--line); background:var(--bg); color:var(--ink); border-radius:20px;
+    padding:7px 12px; font-size:12.5px; cursor:pointer; }
+  .ask-chips button:hover{ border-color:var(--accent); color:var(--accent); }
+  .ask-log{ display:flex; flex-direction:column; gap:12px; margin-top:6px; }
+  .ask-q{ align-self:flex-end; max-width:85%; background:var(--accent); color:#fff; border-radius:14px 14px 4px 14px;
+    padding:9px 13px; font-size:13.5px; line-height:1.6; }
+  .ask-a{ align-self:flex-start; max-width:92%; background:var(--bg); border:1px solid var(--line); color:var(--ink);
+    border-radius:14px 14px 14px 4px; padding:11px 13px; font-size:14px; line-height:1.9; white-space:pre-wrap; }
+  .ask-form{ display:flex; gap:8px; margin-top:14px; }
+  .ask-form textarea{ flex:1; border:1px solid var(--line); border-radius:11px; background:var(--bg); color:var(--ink);
+    font-family:inherit; font-size:14px; padding:10px 12px; resize:none; line-height:1.6; max-height:120px; }
+  .ask-send{ border:none; background:var(--accent); color:#fff; border-radius:11px; padding:0 16px; font-size:14px; cursor:pointer; }
+  .key-notice{ background:var(--bg); border:1px dashed var(--line); border-radius:11px; padding:13px; font-size:13px;
+    color:var(--sub); line-height:1.8; margin-bottom:12px; }
+  .key-notice b{ color:var(--ink); }
+
+  /* 読書統計 */
+  .stat-grid{ display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
+  .stat-tile{ background:var(--bg); border:1px solid var(--line); border-radius:14px; padding:14px 15px; }
+  .stat-tile .num{ font-size:27px; font-weight:700; color:var(--ink); font-variant-numeric:tabular-nums; line-height:1.1; }
+  .stat-tile .num small{ font-size:14px; font-weight:600; color:var(--sub); }
+  .stat-tile .lbl{ font-size:12px; color:var(--sub); margin-top:5px; letter-spacing:.02em; }
+  .stat-head{ font-size:13px; color:var(--sub); letter-spacing:.08em; margin:6px 0 12px; }
+  .auth-bar{ display:flex; align-items:center; gap:10px; margin-bottom:10px; font-size:13px; }
+  .auth-bar .name{ width:6.5em; color:var(--ink); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+  .auth-bar .track{ flex:1; height:9px; background:var(--line); border-radius:6px; overflow:hidden; }
+  .auth-bar .fill{ height:100%; background:linear-gradient(90deg,var(--accent2),var(--accent)); border-radius:6px; }
+  .auth-bar .cnt{ width:2.6em; text-align:right; color:var(--sub); font-variant-numeric:tabular-nums; }
+
+  /* 名文コレクション */
+  .coll-work{ font-size:13px; font-weight:600; color:var(--accent); margin:18px 0 10px; cursor:pointer; display:inline-block; }
+  .coll-work:first-child{ margin-top:0; }
+  .coll-quote{ font-family:var(--font-serif); font-size:14.5px; line-height:1.85; color:var(--ink);
+    border-right:3px solid var(--accent2); padding-right:11px; margin-bottom:6px; }
+  .coll-note{ font-size:12.5px; color:var(--sub); background:var(--bg); border-radius:8px; padding:7px 10px; margin-bottom:13px; line-height:1.65; }
+
+  /* 使い方・ヘルプ */
+  .help h4{ font-size:14px; margin:20px 0 8px; color:var(--accent); letter-spacing:.03em; display:flex; align-items:center; gap:7px; }
+  .help h4:first-child{ margin-top:2px; }
+  .help p{ font-size:13.5px; line-height:1.85; color:var(--ink); margin:0 0 6px; }
+  .help ul{ margin:0 0 4px; padding-left:1.25em; }
+  .help li{ font-size:13.5px; line-height:1.8; color:var(--sub); margin-bottom:4px; }
+  .help li b{ color:var(--ink); font-weight:600; }
+  .help .tip{ font-size:12px; color:var(--sub); background:var(--bg); border:1px solid var(--line); border-radius:9px; padding:9px 11px; margin:6px 0 4px; line-height:1.7; }
+  .help kbd{ font-family:inherit; background:var(--bg); border:1px solid var(--line); border-radius:6px; padding:1px 7px; font-size:12.5px; color:var(--ink); }
 
   /* ---------- drawers / modals ---------- */
   .scrim{position:fixed; inset:0; z-index:70; background:rgba(20,16,10,.42); backdrop-filter:blur(2px); display:flex; justify-content:flex-end}
@@ -191,7 +283,10 @@
     .book rt{font-size:.85em}
     .brand .sub{display:none}
     .brand .logo{font-size:23px}
-    .topbar{gap:6px; padding:0 10px}
+    .topbar{gap:6px; padding-left:10px; padding-right:10px; overflow-x:auto; -webkit-overflow-scrolling:touch; scrollbar-width:none}
+    .topbar::-webkit-scrollbar{display:none}
+    .brand,.icon-btn,.spacer{flex:0 0 auto}
+    .spacer{flex:1 1 auto; min-width:4px}
     .icon-btn{padding:8px 9px; font-size:16px}
     .btl{display:none}
     .lib-controls{gap:7px}
@@ -213,11 +308,15 @@
     <span class="sub">SHIORI &nbsp;/&nbsp; AI文豪コンシェルジュ</span>
   </div>
   <div class="spacer"></div>
-  <button class="icon-btn" id="btn-dict" onclick="openAI('dict')" title="辞書" hidden>📚<span class="btl"> 辞書</span></button>
-  <button class="icon-btn" id="btn-summary" onclick="openAI('summary')" title="あらすじ・解説" hidden>📖<span class="btl"> あらすじ・解説</span></button>
+  <button class="icon-btn" id="btn-ask" onclick="openAsk()" title="AIに質問" hidden>💬<span class="btl"> AIに質問</span></button>
+  <button class="icon-btn" id="btn-notes" onclick="openNotes()" title="ハイライト・メモ" hidden>🖍<span class="btl"> ノート</span></button>
+  <button class="icon-btn" id="btn-summary" onclick="openAI('summary')" title="あらすじ・解説" hidden>📖<span class="btl"> あらすじ</span></button>
   <button class="icon-btn" id="btn-check" onclick="toggleCheckReader()" title="気になる（あとで読む）に登録" hidden>🔖<span class="btl"> 気になる</span></button>
   <button class="icon-btn" id="btn-review" onclick="openReview(cur.work&&cur.work.id)" title="レビュー" hidden>📝<span class="btl"> レビュー</span></button>
   <button class="icon-btn" id="btn-ruby" onclick="toggleRuby()" title="ふりがな（総ルビ）" hidden>ふ<span class="btl"> ふりがな</span></button>
+  <button class="icon-btn" id="btn-stats" onclick="openStats()" title="読書統計">📊<span class="btl"> 統計</span></button>
+  <button class="icon-btn" id="btn-collection" onclick="openCollection()" title="名文コレクション">📑<span class="btl"> 名文集</span></button>
+  <button class="icon-btn" onclick="openHelp()" title="使い方・ヘルプ">❓<span class="btl"> 使い方</span></button>
   <button class="icon-btn" onclick="openSettings()" title="設定">⚙️<span class="btl"> 設定</span></button>
 </div>
 
@@ -226,7 +325,7 @@
   <div class="library-wrap">
     <div class="lib-hero">
       <h1>作品棚</h1>
-      <p>著作権保護期間の終了した名作を、青空文庫から。縦書き・ルビ・外字に対応した読書体験に、AIの読解アシストと挿絵・演出を添えて。<br>読みたい一冊を選んでください。</p>
+      <p>青空文庫の名作を、<b style="color:var(--ink)">“理解しながら読む”</b>。<br>わからない言葉はその場で辞書やAIに聞き、心に残った一文はハイライト。読み終えたら感想を記して、次の一冊へ。</p>
     </div>
     <div class="search">
       <input id="searchInput" type="text" placeholder="作品名・著者名で絞り込み（例：太宰、羅生門、賢治）" oninput="renderLibrary()">
@@ -250,6 +349,7 @@
       <button class="chipbtn" id="begBtn" onclick="toggleBeginner()">◎ はじめての一冊</button>
       <button class="chipbtn" id="checkBtn" onclick="toggleChecked()">🔖 気になる</button>
     </div>
+    <div id="recos" class="recos hidden"></div>
     <div class="lib-count" id="libCount"></div>
     <div id="grid" class="grid"></div>
   </div>
@@ -275,7 +375,17 @@
   </div>
 </div>
 
-<button id="seltip" class="hidden" onmousedown="event.preventDefault()" onclick="lookupSelection()">📖 意味を調べる</button>
+<div id="seltip" class="hidden" onmousedown="event.preventDefault()">
+  <button onclick="selHighlight()" title="ハイライト">🖍<span>ハイライト</span></button>
+  <button onclick="selMemo()" title="メモ">📝<span>メモ</span></button>
+  <button onclick="selAsk()" title="AIに聞く">💬<span>AIに聞く</span></button>
+  <button onclick="lookupSelection()" title="辞書で調べる">📖<span>辞書</span></button>
+</div>
+<div id="hltip" class="hidden" onmousedown="event.preventDefault()">
+  <button onclick="hlMemo()" title="メモ">📝<span>メモ</span></button>
+  <button onclick="hlCycleColor()" title="色を変える">🎨<span>色</span></button>
+  <button class="del" onclick="hlDelete()" title="ハイライトを削除">🗑<span>削除</span></button>
+</div>
 
 <script>
 /* =========================================================
@@ -577,8 +687,18 @@ function fmtTime(m){ return m<90 ? m+"分" : "約"+Math.round(m/60)+"時間"; }
 function lenLabel(m){ return m<20?"短い": m<75?"ふつう": m<200?"長め":"長編"; }
 
 /* ---------- settings (localStorage) ---------- */
-const DEF_SETTINGS = { theme:"washi", size:22, openaiKey:"", chatModel:"gpt-4o-mini" };
+const DEF_SETTINGS = { theme:"washi", size:22, geminiKey:"", chatModel:"gemini-2.5-flash-lite" };
 let settings = load("shiori.settings", DEF_SETTINGS);
+// 旧OpenAI設定からのマイグレーション: gpt-* モデルはGeminiでは無効なので既定へ寄せる
+if(/^gpt/i.test(settings.chatModel||"")) settings.chatModel = "gemini-2.5-flash-lite";
+delete settings.openaiKey;   // 旧OpenAIキーは使わない（Geminiキーとは別物）
+// スマホは文字サイズの既定を12pxに（初回、または既定22pxのまま未調整の端末へ一度だけ適用）
+if(!localStorage.getItem("shiori.sizeInit")){
+  var __isPhone = window.matchMedia("(pointer:coarse)").matches && Math.min(window.innerWidth||9999, window.innerHeight||9999) <= 700;
+  if(__isPhone && settings.size===22) settings.size = 12;   // 自分で別サイズにした人は尊重
+  save("shiori.settings", settings);
+  localStorage.setItem("shiori.sizeInit","1");
+}
 // 本棚: id -> {fraction, updated, checked, rating, review, reviewDate}
 let shelf = load("shiori.shelf", {});
 
@@ -638,6 +758,51 @@ function toggleCheckReader(){   // 読書画面から「気になる」登録
   document.getElementById("btn-check").classList.toggle("active", r.checked);
 }
 function lastActivity(id){ const r=shelf[id]; return r ? (r.reviewDate||r.updated||"") : ""; }
+/* ---------- 次の一冊レコメンド（評価・難易度から） ---------- */
+function recoCard(w, md, reason, cont){
+  return `<div class="reco-card" data-wid="${w.id}">
+    <div class="rc-title">${w.title}</div>
+    <div class="rc-author">${w.author}</div>
+    <div class="rc-reason">${cont?"▶ ":""}${escapeHtml(reason)}</div>
+    <div class="rc-meta">難 ${diffInline(md.diff)} ・ ⏱ ${fmtTime(md.min)}</div>
+  </div>`;
+}
+function renderRecommendations(show){
+  const box=document.getElementById("recos"); if(!box) return;
+  if(!show){ box.classList.add("hidden"); box.innerHTML=""; return; }
+  const m=id=>META[id]||{min:0,diff:2,beginner:false};
+  const done=new Set(WORKS.filter(w=>statusOf(w.id)==="done").map(w=>w.id));
+  const readingWorks=WORKS.filter(w=>statusOf(w.id)==="reading");
+  const liked=WORKS.filter(w=> shelf[w.id] && shelf[w.id].rating>=4);
+  const likedAuthors={}; liked.forEach(w=>{ (likedAuthors[w.author]=likedAuthors[w.author]||[]).push(w); });
+  const hasHistory = liked.length>0 || readingWorks.length>0 || done.size>0;
+  const targetDiff = liked.length? liked.reduce((s,w)=>s+m(w.id).diff,0)/liked.length : null;
+
+  const scored=WORKS.filter(w=> !done.has(w.id) && statusOf(w.id)!=="reading").map(w=>{
+    const md=m(w.id); let sc=0, reason="";
+    if(likedAuthors[w.author]){ sc+=3; reason=`『${likedAuthors[w.author][0].title}』がお好みなら、同じ${w.author}を`; }
+    if(targetDiff!=null) sc += 2 - Math.min(2, Math.abs(md.diff-targetDiff));
+    if(!hasHistory && md.beginner){ sc+=3.5; reason="はじめの一冊に。やさしく短い名作です"; }
+    if(!reason){
+      if(md.beginner) reason="読みやすく、名作の入り口に";
+      else if(md.diff>=4) reason="歯ごたえのある一作。腕試しに";
+      else reason="次に読むならこのあたりを";
+    }
+    sc += (200-Math.min(200,md.min))/400;   // 短めを少し優遇
+    return {w, md, sc, reason};
+  }).sort((a,b)=> b.sc-a.sc);
+
+  let html=`<h2>🧭 ${hasHistory?"あなたへの次の一冊":"はじめの一冊に"}</h2><div class="reco-row">`;
+  readingWorks.slice(0,2).forEach(w=>{
+    const pct=Math.round((shelf[w.id].fraction||0)*100);
+    html+=recoCard(w, m(w.id), `続きから（${pct}%）`, true);
+  });
+  scored.slice(0,6).forEach(p=> html+=recoCard(p.w, p.md, p.reason, false));
+  html+=`</div>`;
+  box.innerHTML=html; box.classList.remove("hidden");
+  box.querySelectorAll("[data-wid]").forEach(el=> el.onclick=()=>{ const w=WORKS.find(x=>x.id===el.dataset.wid); if(w) openWork(w); });
+}
+
 function renderLibrary(){
   const q = (document.getElementById("searchInput").value||"").trim().toLowerCase();
   const grid = document.getElementById("grid");
@@ -655,6 +820,8 @@ function renderLibrary(){
       (m(b.id).beginner-m(a.id).beginner) || (m(a.id).diff-m(b.id).diff) || (m(a.id).min-m(b.id).min));
   else if(libSort==="rating")list = [...list].sort((a,b)=> ((shelf[b.id]&&shelf[b.id].rating)||0)-((shelf[a.id]&&shelf[a.id].rating)||0));
   else if(libSort==="recent")list = [...list].sort((a,b)=> lastActivity(b.id).localeCompare(lastActivity(a.id)));
+
+  renderRecommendations(!q && libStatus==="all" && !libBeginnerOnly && !libCheckedOnly);
 
   const parts = [];
   if(libBeginnerOnly) parts.push("はじめての一冊");
@@ -754,11 +921,14 @@ function deleteReview(id, btn){
 function showLibrary(){
   document.getElementById("reader").classList.add("hidden");
   document.getElementById("library").classList.remove("hidden");
-  document.getElementById("btn-dict").hidden = true;
+  document.getElementById("btn-ask").hidden = true;
+  document.getElementById("btn-notes").hidden = true;
   document.getElementById("btn-summary").hidden = true;
   document.getElementById("btn-check").hidden = true;
   document.getElementById("btn-review").hidden = true;
   document.getElementById("btn-ruby").hidden = true;
+  document.getElementById("btn-stats").hidden = false;
+  document.getElementById("btn-collection").hidden = false;
   document.getElementById("finishToast").classList.add("hidden");
   renderLibrary();
 }
@@ -770,11 +940,14 @@ async function openWork(w){
   cur.work = w;
   document.getElementById("library").classList.add("hidden");
   document.getElementById("reader").classList.remove("hidden");
-  document.getElementById("btn-dict").hidden = false;
+  document.getElementById("btn-ask").hidden = false;
+  document.getElementById("btn-notes").hidden = false;
   document.getElementById("btn-summary").hidden = false;
   document.getElementById("btn-check").hidden = false;
   document.getElementById("btn-review").hidden = false;
   document.getElementById("btn-ruby").hidden = false;
+  document.getElementById("btn-stats").hidden = true;
+  document.getElementById("btn-collection").hidden = true;
   document.getElementById("btn-check").classList.toggle("active", !!(shelf[w.id] && shelf[w.id].checked));
   document.getElementById("finishToast").classList.add("hidden");
   reviewPrompted = false;
@@ -815,6 +988,7 @@ async function openWork(w){
     await (document.fonts ? document.fonts.ready : Promise.resolve());
     loading.classList.add("hidden");
     requestAnimationFrame(()=>{
+      renderHighlights();   // マーカーは背景色のみなのでレイアウトを変えない
       paginate();
       const r = shelf[w.id];
       goToFraction(r ? (r.fraction||0) : 0, false);
@@ -871,6 +1045,7 @@ function maybePromptReview(){
 function turn(dir){
   const next = cur.page + dir;
   if(next<0 || next>=cur.pages) return;
+  hideHlTip(); hideSelTip();
   cur.page = next; applyPage();
 }
 function goToFraction(frac, animate=true){
@@ -925,7 +1100,7 @@ document.addEventListener("selectionchange", ()=>{
   const book = document.getElementById("book");
   if(!sel || sel.isCollapsed || document.getElementById("reader").classList.contains("hidden")){ tip.classList.add("hidden"); return; }
   const text = sel.toString().trim();
-  if(!text || text.length>40 || !book.contains(sel.anchorNode)){ tip.classList.add("hidden"); return; }
+  if(!text || text.length>300 || !book.contains(sel.anchorNode)){ tip.classList.add("hidden"); return; }
   const r = sel.getRangeAt(0).getBoundingClientRect();
   tip.style.left = (r.left + r.width/2)+"px";
   tip.style.top = r.top+"px";
@@ -1085,7 +1260,7 @@ async function toggleRuby(){
     // OFF: ふりがな適用前に戻す
     book.innerHTML = cur.baseHTML;
     cur.rubyOn = false; btn.classList.remove("active");
-    requestAnimationFrame(()=>{ paginate(); goToFraction(frac,false); });
+    requestAnimationFrame(()=>{ renderHighlights(); paginate(); goToFraction(frac,false); });
     return;
   }
   // ON: 必要になったので付与
@@ -1101,33 +1276,56 @@ async function toggleRuby(){
   }
   loading.classList.add("hidden");
   rubyBusy = false;
-  requestAnimationFrame(()=>{ paginate(); goToFraction(frac,false); });
+  requestAnimationFrame(()=>{ renderHighlights(); paginate(); goToFraction(frac,false); });
 }
 
 /* =========================================================
    AI CONCIERGE
    ========================================================= */
-function hasKey(){ return !!(settings.openaiKey && settings.openaiKey.trim()); }
+function geminiKey(){ return (settings.geminiKey||"").trim(); }
+function hasKey(){ return !!geminiKey(); }
 
+/* ---------- Gemini API（無料枠・クレカ不要・ブラウザ直叩き・429で自動モデル切替） ----------
+   引数は OpenAI 互換の messages 形式（[{role:"system"|"user",content}]）。戻り値はプレーンテキスト。 */
+const GEMINI_MODELS=["gemini-2.5-flash-lite","gemini-2.0-flash","gemini-2.5-flash"];
 async function openaiChat(messages, opts={}){
-  const res = await fetch("https://api.openai.com/v1/chat/completions",{
-    method:"POST",
-    headers:{"Content-Type":"application/json","Authorization":"Bearer "+settings.openaiKey.trim()},
-    body: JSON.stringify({ model: settings.chatModel||"gpt-4o-mini", messages, temperature:0.7, ...opts })
-  });
-  if(!res.ok){ throw new Error("OpenAI API "+res.status+": "+(await res.text()).slice(0,200)); }
-  const data = await res.json();
-  return data.choices[0].message.content.trim();
-}
-async function openaiImage(prompt){
-  const res = await fetch("https://api.openai.com/v1/images/generations",{
-    method:"POST",
-    headers:{"Content-Type":"application/json","Authorization":"Bearer "+settings.openaiKey.trim()},
-    body: JSON.stringify({ model:"dall-e-3", prompt, n:1, size:"1024x1024" })
-  });
-  if(!res.ok){ throw new Error("OpenAI Image "+res.status+": "+(await res.text()).slice(0,200)); }
-  const data = await res.json();
-  return data.data[0].url;
+  const key=geminiKey();
+  if(!key) throw new Error("Gemini APIキーが未設定です。⚙️設定で無料キーを入れてください。");
+  const sys = messages.filter(m=>m.role==="system").map(m=>m.content).join("\n\n");
+  const userText = messages.filter(m=>m.role!=="system").map(m=>m.content).join("\n\n");
+  const preferred = settings.chatModel || GEMINI_MODELS[0];
+  const pool = [preferred, ...GEMINI_MODELS.filter(m=>m!==preferred)];   // 今のモデル→他モデルの順に試す
+  for(let mi=0; mi<pool.length; mi++){
+    const model = pool[mi];
+    const gc = { temperature: opts.temperature!=null?opts.temperature:0.7, maxOutputTokens: opts.maxOutputTokens||1024 };
+    if(/2\.5/.test(model)) gc.thinkingConfig={thinkingBudget:0};   // 思考OFF指定は2.5系のみ対応
+    const body = { contents:[{role:"user",parts:[{text:userText}]}], generationConfig:gc };
+    if(sys) body.systemInstruction={parts:[{text:sys}]};
+    const url=`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`;
+    let res;
+    for(let attempt=0; attempt<3; attempt++){
+      res=await fetch(url,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(body)});
+      if(res.status!==503 && res.status!==500) break;   // 高負荷(混雑)は少し待って自動リトライ
+      if(attempt<2) await new Promise(r=>setTimeout(r,1500*(attempt+1)));
+    }
+    if(res.status===429 && mi<pool.length-1) continue;   // 上限→自動で次のモデルへ
+    if(!res.ok){
+      let msg=res.status+" "+res.statusText;
+      try{ const e=await res.json(); msg=(e.error&&e.error.message)||msg; }catch(_){}
+      if(res.status===400 && /API key|API_KEY/i.test(msg)) msg="APIキーが無効です。設定を確認してください。";
+      if(res.status===403) msg="APIキーが無効か権限がありません。設定を確認してください。";
+      if(res.status===429) msg="無料枠の上限に達しました。しばらく待つか、明日また試してください（無料枠は日本の昼ごろリセット）。";
+      if(res.status===503||res.status===500) msg="Geminiが一時的に混雑しています（高負荷）。数十秒おいて再試行してください。";
+      throw new Error(msg);
+    }
+    const data=await res.json();
+    if(data.promptFeedback&&data.promptFeedback.blockReason) throw new Error("安全上の理由でブロックされました。質問を変えてお試しください。");
+    const cand=data.candidates&&data.candidates[0];
+    const text=((cand&&cand.content&&cand.content.parts)||[]).map(p=>p.text).filter(Boolean).join("").trim();
+    if(!text) throw new Error("応答を取得できませんでした。"+(cand&&cand.finishReason?` (${cand.finishReason})`:""));
+    if(model!==settings.chatModel){ settings.chatModel=model; saveSettings(); }   // 通ったモデルを次回優先
+    return text;
+  }
 }
 
 let aiTab = "dict";
@@ -1143,7 +1341,6 @@ function openAI(tab){
         <button data-t="dict">辞書</button>
         <button data-t="summary">あらすじ</button>
         <button data-t="era">時代背景</button>
-        <button data-t="illust">挿絵</button>
       </div>
       <div class="dbody" id="aiBody"></div>
     </div>`;
@@ -1182,12 +1379,6 @@ function renderAITab(){
       `<div class="note">${wk}</div>
        <div class="ai-out" id="eraOut" style="margin-top:10px"><span class="spin"></span> 時代背景を読み込み中…</div>`;
     runEra();
-  } else if(aiTab==="illust"){
-    body.innerHTML =
-      `<div class="note">いま読んでいる場面から挿絵を生成します。 ${hasKey()?"":'<span class="demo-tag">DEMO</span>'}</div>
-       <button class="btn-primary" style="margin:10px 0" onclick="runIllust()">この場面の挿絵を生成</button>
-       <div class="illust" id="illustBox" style="margin-top:12px"><span style="color:var(--sub);font-size:13px">まだ生成されていません</span></div>
-       <div class="ai-out placeholder" id="illustCap" style="margin-top:10px"></div>`;
   }
 }
 function setOut(id, html, cls){ const el=document.getElementById(id); if(!el) return; el.className="ai-out"+(cls?" "+cls:""); el.innerHTML=html; }
@@ -1277,38 +1468,290 @@ async function runEra(){
     }
   }catch(e){ setOut("eraOut","エラー: "+e.message,"placeholder"); }
 }
-async function runIllust(){
-  const box = document.getElementById("illustBox");
-  const cap = document.getElementById("illustCap");
-  const scene = visiblePageText().slice(0,300) || cur.plainText.slice(0,300);
-  box.innerHTML = `<span class="spin"></span>`;
-  cap.className="ai-out"; cap.textContent = "場面を解釈しています…";
-  try{
-    if(hasKey()){
-      const artPrompt = await openaiChat([
-        {role:"system",content:"あなたは挿絵ディレクターです。与えられた日本文学の一場面を、絵画的な英語の画像生成プロンプト1文に変換します。文体は 'Japanese literary illustration, ...' で始め、人物の顔の細部は避け情景重視。"},
-        {role:"user",content:scene}
-      ]);
-      cap.textContent = "挿絵を描いています…";
-      const url = await openaiImage("Japanese literary book illustration, muted ink-wash palette. "+artPrompt);
-      box.innerHTML = `<img src="${url}" alt="挿絵">`;
-      cap.textContent = artPrompt;
-    } else {
-      const {key} = analyzeEmotion(scene);
-      box.innerHTML = mockIllustSVG(key, scene);
-      cap.innerHTML = `<span class="demo-tag">DEMO</span> 情感「${EMOTIONS[key].label}」に基づく生成イメージ（APIキー設定で実際の挿絵生成に切り替わります）`;
-    }
-  }catch(e){ box.innerHTML = `<span style="color:var(--sub);font-size:12px;padding:14px">${e.message}</span>`; cap.textContent=""; }
-}
 function lookupSelection(){
   const t = currentSelectionText();
-  document.getElementById("seltip").classList.add("hidden");
+  hideSelTip();
   openAI("dict");
   setTimeout(()=>{ const i=document.getElementById("dictInput"); if(i){ i.value=t; runDict(); } }, 60);
 }
+function hideSelTip(){ const t=document.getElementById("seltip"); if(t) t.classList.add("hidden"); }
+
+/* =========================================================
+   ハイライト / メモ
+   ========================================================= */
+let hlSeq = 0;
+function newHid(){ hlSeq++; return "h"+Date.now().toString(36)+hlSeq.toString(36); }
+function hlList(){ return (cur.work && shelf[cur.work.id] && shelf[cur.work.id].highlights) || []; }
+function ensureHlArray(){ const r=rec(cur.work.id); if(!r.highlights) r.highlights=[]; return r.highlights; }
+
+// 本文テキストノードを（ルビ読み rt/rp を除いて）連結したフラットテキスト
+function buildFlat(root){
+  const segs=[]; let text="";
+  const w=document.createTreeWalker(root, NodeFilter.SHOW_TEXT, {
+    acceptNode(n){
+      if(!n.nodeValue) return NodeFilter.FILTER_REJECT;
+      let p=n.parentNode;
+      while(p&&p!==root){ if(p.nodeName==="RT"||p.nodeName==="RP") return NodeFilter.FILTER_REJECT; p=p.parentNode; }
+      return NodeFilter.FILTER_ACCEPT;
+    }
+  });
+  let n; while(n=w.nextNode()){ segs.push({node:n, start:text.length, len:n.nodeValue.length}); text+=n.nodeValue; }
+  return {segs, text};
+}
+function unwrapHighlights(root){
+  root.querySelectorAll("mark.hl").forEach(m=>{
+    const p=m.parentNode; while(m.firstChild) p.insertBefore(m.firstChild, m); p.removeChild(m); p.normalize();
+  });
+}
+function wrapFlatRange(flat, fStart, fEnd, hid, color, hasNote){
+  for(const s of flat.segs){
+    const segEnd=s.start+s.len;
+    if(segEnd<=fStart || s.start>=fEnd) continue;
+    const a=Math.max(fStart,s.start)-s.start, b=Math.min(fEnd,segEnd)-s.start;
+    if(b<=a) continue;
+    try{
+      const range=document.createRange(); range.setStart(s.node,a); range.setEnd(s.node,b);
+      const mark=document.createElement("mark");
+      mark.className="hl"+(hasNote?" hasnote":""); mark.dataset.hid=hid;
+      if(color&&color!=="amber") mark.dataset.color=color;
+      mark.addEventListener("click",(e)=>{ e.stopPropagation(); showHlTip(hid, e); });
+      range.surroundContents(mark);
+    }catch(e){}
+  }
+}
+function renderHighlights(){
+  const book=document.getElementById("book"); if(!book||!cur.work) return;
+  unwrapHighlights(book);
+  normalizeHighlights(book);   // 重なりを統合してから描画（常に一色）
+  hlList().filter(h=>h.text).forEach(h=>{
+    const flat=buildFlat(book);   // マーク挿入でDOMが変わるため毎回作り直す
+    let idx=-1, from=0, count=0;
+    while((idx=flat.text.indexOf(h.text, from))>=0){ if(count===(h.occurrence||0)) break; from=idx+1; count++; }
+    if(idx<0) idx=flat.text.indexOf(h.text);
+    if(idx<0) return;
+    wrapFlatRange(flat, idx, idx+h.text.length, h.hid, h.color, !!(h.note&&h.note.trim()));
+  });
+}
+function selectionInfo(){
+  const sel=document.getSelection(); if(!sel||sel.isCollapsed) return null;
+  const text=sel.toString().trim(); if(!text) return null;
+  const book=document.getElementById("book"); if(!book.contains(sel.anchorNode)) return null;
+  const flat=buildFlat(book);
+  const range=sel.getRangeAt(0);
+  let fStart=-1;
+  for(const s of flat.segs){ if(s.node===range.startContainer){ fStart=s.start+range.startOffset; break; } }
+  let occurrence=0;
+  if(fStart>=0){ let from=0, idx; while((idx=flat.text.indexOf(text, from))>=0 && idx<fStart){ occurrence++; from=idx+1; } }
+  return {text, occurrence, fStart};
+}
+// ハイライトの現在のフラット範囲 [start,end]（見つからなければ null）
+function hlFlatRange(h, flat){
+  if(!h.text) return null;
+  let idx=-1, from=0, c=0;
+  while((idx=flat.text.indexOf(h.text, from))>=0){ if(c===(h.occurrence||0)) break; from=idx+1; c++; }
+  if(idx<0) idx=flat.text.indexOf(h.text);
+  if(idx<0) return null;
+  return [idx, idx+h.text.length];
+}
+// 重なり合うハイライトを1つに統合（＝重ね塗り防止）
+function normalizeHighlights(book){
+  const r=cur.work && shelf[cur.work.id]; if(!r||!r.highlights||!r.highlights.length) return;
+  const flat=buildFlat(book);
+  const items=[], rest=[];
+  for(const h of r.highlights){ const rng=hlFlatRange(h,flat); if(rng) items.push({h,rng}); else rest.push(h); }
+  items.sort((a,b)=> a.rng[0]-b.rng[0] || a.rng[1]-b.rng[1]);
+  const merged=[];
+  for(const it of items){
+    const last=merged[merged.length-1];
+    if(last && it.rng[0] < last.rng[1]){                       // 重なり → 統合
+      if(it.rng[1]>last.rng[1]) last.rng[1]=it.rng[1];
+      if(it.h.note && it.h.note.trim()) last.h.note=(last.h.note&&last.h.note.trim()? last.h.note+" / ":"")+it.h.note;
+    } else merged.push({h:it.h, rng:it.rng.slice()});
+  }
+  const rebuilt=merged.map(m=>{
+    const text=flat.text.slice(m.rng[0], m.rng[1]);
+    let occ=0, from=0, idx; while((idx=flat.text.indexOf(text,from))>=0 && idx<m.rng[0]){ occ++; from=idx+1; }
+    return {hid:m.h.hid, text, occurrence:occ, note:m.h.note||"", color:m.h.color||"amber", date:m.h.date||isoNow()};
+  });
+  r.highlights = rebuilt.concat(rest);
+  saveShelf();
+}
+function addHighlight(){
+  if(!cur.work) return null;
+  const info=selectionInfo(); if(!info) return null;
+  ensureHlArray().push({hid:newHid(), text:info.text, occurrence:info.occurrence, note:"", color:"amber", date:isoNow()});
+  try{ document.getSelection().removeAllRanges(); }catch(e){}
+  hideSelTip();
+  renderHighlights();   // ここで重なりが統合される
+  // 統合後、選択位置を含むハイライトを返す（メモ導線用）
+  const flat=buildFlat(document.getElementById("book"));
+  let pos=info.fStart;
+  if(pos<0){ let idx=-1,from=0,c=0; while((idx=flat.text.indexOf(info.text,from))>=0){ if(c===info.occurrence) break; from=idx+1; c++; } pos=idx; }
+  return hlList().find(x=>{ const rg=hlFlatRange(x,flat); return rg && pos>=rg[0] && pos<rg[1]; }) || null;
+}
+function removeHighlight(hid){
+  if(!cur.work) return;
+  const r=rec(cur.work.id); if(!r.highlights) return;
+  r.highlights=r.highlights.filter(h=>h.hid!==hid); saveShelf(); renderHighlights();
+}
+function setHlColor(hid,color){ const h=hlList().find(x=>x.hid===hid); if(!h) return; h.color=color; saveShelf(); renderHighlights(); }
+function setHlNote(hid,note){
+  const h=hlList().find(x=>x.hid===hid); if(!h) return; h.note=note; saveShelf();
+  const m=document.querySelector('#book mark.hl[data-hid="'+hid+'"]'); if(m) m.classList.toggle("hasnote", !!note.trim());
+}
+/* 本文のマーカーをタップ → メモ／色変更／削除のポップアップ */
+let curHlId=null;
+function showHlTip(hid, e){
+  hideSelTip(); curHlId=hid;
+  const tip=document.getElementById("hltip");
+  tip.style.left=e.clientX+"px"; tip.style.top=(e.clientY-4)+"px";
+  tip.classList.remove("hidden");
+}
+function hideHlTip(){ const t=document.getElementById("hltip"); if(t) t.classList.add("hidden"); curHlId=null; }
+function hlMemo(){ const id=curHlId; hideHlTip(); if(id) openNotes(id); }
+function hlCycleColor(){
+  const h=hlList().find(x=>x.hid===curHlId); if(!h) return;
+  const keys=HL_COLORS.map(c=>c[0]); const i=keys.indexOf(h.color);
+  h.color=keys[(i+1)%keys.length]; saveShelf(); renderHighlights();
+}
+function hlDelete(){ const id=curHlId; hideHlTip(); if(id) removeHighlight(id); }
+document.addEventListener("click",(e)=>{
+  const tip=document.getElementById("hltip");
+  if(tip && !tip.classList.contains("hidden") && !tip.contains(e.target)) hideHlTip();
+});
+/* 選択メニューのアクション */
+function selHighlight(){ addHighlight(); }
+function selMemo(){ const h=addHighlight(); if(h) openNotes(h.hid); }
+function selAsk(){ const t=currentSelectionText(); hideSelTip(); openAsk(t); }
+
+/* ノート（ハイライト・メモ）一覧パネル */
+const HL_COLORS=[["amber","rgba(224,166,61,.7)"],["pink","rgba(200,90,110,.7)"],["blue","rgba(91,127,176,.7)"],["green","rgba(111,155,116,.7)"]];
+function openNotes(focusHid){
+  if(!cur.work) return;
+  if(document.getElementById("notesBody")){ renderNotesBody(focusHid); return; }
+  const scrim=document.createElement("div"); scrim.className="scrim";
+  scrim.onclick=(e)=>{ if(e.target===scrim) scrim.remove(); };
+  scrim.innerHTML=`
+    <div class="drawer" onclick="event.stopPropagation()">
+      <div class="dhead"><h3>🖍 ハイライト・メモ</h3>
+        <button class="icon-btn close" onclick="this.closest('.scrim').remove()">閉じる</button></div>
+      <div class="dbody" id="notesBody"></div>
+    </div>`;
+  document.body.appendChild(scrim);
+  renderNotesBody(focusHid);
+}
+function renderNotesBody(focusHid){
+  const body=document.getElementById("notesBody"); if(!body) return;
+  const arr=hlList();
+  let html=`<button class="btn-ghost" style="margin-bottom:14px" onclick="addStandaloneMemo()">＋ メモを追加</button>`;
+  if(!arr.length) html+=`<div class="note">本文をなぞって「🖍 ハイライト」や「📝 メモ」を押すと、ここに一覧されます。読み返しやテスト対策に。</div>`;
+  arr.slice().reverse().forEach(h=>{
+    const sw=HL_COLORS.map(([k,c])=>`<span class="swatch ${h.color===k?'on':''}" style="background:${c}" title="${k}" onclick="setHlColor('${h.hid}','${k}'); renderNotesBody()"></span>`).join("");
+    html+=`<div class="note-item" id="ni-${h.hid}">
+      ${h.text?`<div class="quote">${escapeHtml(trimLen(h.text,140))}</div>`:`<div class="quote empty">（メモのみ）</div>`}
+      <textarea placeholder="メモを書く…" oninput="setHlNote('${h.hid}', this.value)">${escapeHtml(h.note||"")}</textarea>
+      ${h.text?`<div class="swatch-row">${sw}</div>`:``}
+      <div class="row"><span class="date">${h.date||""}</span>
+        <button class="del" onclick="removeHighlight('${h.hid}'); renderNotesBody()">削除</button></div>
+    </div>`;
+  });
+  body.innerHTML=html;
+  if(focusHid){ const el=document.querySelector('#ni-'+focusHid+' textarea'); if(el){ el.focus(); el.scrollIntoView({block:"center"}); } }
+}
+function addStandaloneMemo(){
+  const arr=ensureHlArray();
+  const h={hid:newHid(), text:"", occurrence:0, note:"", color:"amber", date:isoNow()};
+  arr.push(h); saveShelf(); renderNotesBody(h.hid);
+}
+
+/* =========================================================
+   AIに聞く（読書コンシェルジュ）
+   ========================================================= */
+let askSelText="", askLog=[];
+const ASK_PRESETS={
+  "現代語訳":"選択箇所を、現代語にやさしく訳してください。",
+  "語句の意味":"選択箇所に出てくる語句の意味を、この文脈に沿って説明してください。",
+  "表現の意図":"選択箇所の表現で、作者が何を狙っているか・読みどころを説明してください。",
+  "見どころ":"この場面の文学的な見どころを教えてください。",
+  "テーマ":"この作品のテーマを、わかりやすく教えてください。",
+  "あらすじ":"この作品のあらすじを、結末に触れすぎない範囲で教えてください。",
+  "テスト":"この作品について、高校の国語のテストで問われそうなポイントを挙げてください。",
+  "作者":"作者がこの作品で伝えたかったことを教えてください。"
+};
+function openAsk(selText){
+  if(!cur.work) return;
+  askSelText = selText || ""; askLog = [];
+  const scrim=document.createElement("div"); scrim.className="scrim";
+  scrim.onclick=(e)=>{ if(e.target===scrim) scrim.remove(); };
+  const chips = askSelText ? `
+      <div class="ask-quotes">${escapeHtml(trimLen(askSelText,160))}</div>
+      <div class="ask-chips">
+        <button onclick="askQuick('現代語訳')">💬 現代語訳</button>
+        <button onclick="askQuick('語句の意味')">📖 語句の意味</button>
+        <button onclick="askQuick('表現の意図')">🧠 表現の意図</button>
+        <button onclick="askQuick('見どころ')">✨ 見どころ</button>
+      </div>` : `
+      <div class="ask-chips">
+        <button onclick="askQuick('テーマ')">🧠 テーマ</button>
+        <button onclick="askQuick('あらすじ')">📖 あらすじ</button>
+        <button onclick="askQuick('テスト')">📝 テストに出そうな点</button>
+        <button onclick="askQuick('作者')">✨ 作者の意図</button>
+      </div>`;
+  const notice = hasKey()? "" : `<div class="key-notice">💡 AIとの対話には <b>Gemini APIキー（無料・クレカ不要）</b> が必要です。<br>
+        <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener" style="color:var(--accent);font-weight:600">🔑 無料キーを取得（aistudio.google.com/apikey）</a> → Googleでログイン →「Create API key」でコピー。<br>
+        <span style="color:var(--sub);font-size:12px">※ キーはこの端末のブラウザ内にだけ保存され、外部には送られません（GoogleへのAPI通信を除く）。無料枠の範囲で使えます。共有PCではご注意を。</span>
+        <button class="btn-ghost" style="margin-top:9px" onclick="this.closest('.scrim').remove(); openSettings()">⚙️ 設定でキーを入れる</button></div>`;
+  scrim.innerHTML=`
+    <div class="drawer" onclick="event.stopPropagation()">
+      <div class="dhead"><h3>💬 AIに聞く</h3>
+        <button class="icon-btn close" onclick="this.closest('.scrim').remove()">閉じる</button></div>
+      <div class="dbody" style="display:flex; flex-direction:column">
+        <div class="note">『${cur.work.title}』（${cur.work.author}）について、${askSelText?"選択箇所や":""}作品全体を質問できます。</div>
+        ${notice}
+        ${chips}
+        <div class="ask-log" id="askLog"></div>
+        <div class="ask-form">
+          <textarea id="askInput" rows="1" placeholder="質問を入力…（例：なぜ老婆は髪を抜いていたの？）"
+            onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault(); askSend();}"></textarea>
+          <button class="ask-send" onclick="askSend()">送信</button>
+        </div>
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+  renderAskLog();
+}
+function renderAskLog(){
+  const el=document.getElementById("askLog"); if(!el) return;
+  el.innerHTML = askLog.map(t=>
+    `<div class="ask-q">${escapeHtml(t.q)}</div>`+
+    `<div class="ask-a">${t.pending?'<span class="spin"></span> 考えています…':escapeHtml(t.a)}</div>`
+  ).join("");
+  el.scrollTop = el.scrollHeight;
+}
+function askQuick(key){ askRun(ASK_PRESETS[key]||key, key); }
+function askSend(){ const i=document.getElementById("askInput"); const q=(i?i.value:"").trim(); if(!q) return; if(i) i.value=""; askRun(q); }
+function askContext(){
+  const w=cur.work, sum=SUMMARIES[w.id]||"";
+  const scene=(typeof visiblePageText==="function"? visiblePageText():"" ).slice(0,500) || cur.plainText.slice(0,500);
+  return `作品：『${w.title}』（${w.author}）\nあらすじ：${sum}\nいま読んでいる場面（抜粋）：${scene}`;
+}
+async function askRun(question, label){
+  if(!hasKey()){
+    askLog.push({q: label?label:question, a:"AIに質問するには、⚙️設定で Gemini の API キー（無料・クレカ不要）を入れてください。\n（語句の意味だけなら、本文を選択して「📖 辞書」で無料で調べられます。）"});
+    renderAskLog(); return;
+  }
+  const entry={q: label?label:question, a:"", pending:true}; askLog.push(entry); renderAskLog();
+  try{
+    const out=await openaiChat([
+      {role:"system",content:"あなたは『AI文豪コンシェルジュ』。日本近代文学に精通した、やさしく的確な読書の相棒です。読者の理解を助けるため、平易な言葉で簡潔に（目安250字以内）答えます。難しい語はかみくだき、必要なら具体例を出します。ネタバレは聞かれた範囲にとどめ、作品本文に基づいて答えます。"},
+      {role:"user",content:`${askContext()}\n${askSelText?`選択箇所：「${askSelText}」\n`:""}質問：${question}`}
+    ]);
+    entry.a=out; entry.pending=false; renderAskLog();
+  }catch(e){ entry.a="エラー: "+e.message; entry.pending=false; renderAskLog(); }
+}
 
 function mockExplain(term){
-  return `【デモ表示】「${term}」\n\nこの語句は、作品の文脈においてしばしば情景や心情を象徴的に示す言葉として用いられます。前後の描写と重ねて読むと、作者が込めた含みがより鮮明になります。\n\n※ 設定画面で OpenAI の API キーを入力すると、AIが文脈に沿った実際の解説を返します。`;
+  return `【デモ表示】「${term}」\n\nこの語句は、作品の文脈においてしばしば情景や心情を象徴的に示す言葉として用いられます。前後の描写と重ねて読むと、作者が込めた含みがより鮮明になります。\n\n※ 設定画面で Gemini の無料 API キーを入力すると、AIが文脈に沿った実際の解説を返します。`;
 }
 function mockSummary(){
   return `【デモ表示】『${cur.work?.title}』（${cur.work?.author}）\n\n静かな筆致の内に、人間の心の機微が丹念に描き出されていく一編です。何気ない情景描写の積み重ねが、やがて登場人物の内面へと読者を導いていきます。\n\n※ API キーを設定すると、本文に基づく実際の要約に切り替わります。`;
@@ -1355,15 +1798,25 @@ function openSettings(){
         </div>
         <div class="note" style="margin:-6px 0 18px">💡 ふりがな（総ルビ）は、読書画面の「ふりがな」ボタンで必要なときだけ付けられます。</div>
         <hr style="border:none;border-top:1px solid var(--line);margin:22px 0">
-        <div class="field"><label>OpenAI API キー（任意）</label>
-          <input type="password" id="keyInput" value="${escapeAttr(settings.openaiKey)}" placeholder="sk-... 未入力ならデモ動作">
-          <div class="note">キーはこの端末のブラウザ内（localStorage）にのみ保存され、外部には送信されません（OpenAIへのAPI通信を除く）。挿絵生成・語句解説などが実際に動作します。</div>
+        <div class="field"><label>Gemini API キー（無料・任意）</label>
+          <input type="password" id="keyInput" value="${escapeAttr(settings.geminiKey)}" placeholder="AIza... 未入力ならデモ動作">
+          <div class="note">Google の <b>Gemini（無料枠・クレカ不要）</b> を直接呼び出します。キーはこの端末のブラウザ内（localStorage）にのみ保存され、外部には送信されません（GoogleへのAPI通信を除く）。<br>キー取得: <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>（Googleでログイン→「Create API key」）</div>
         </div>
-        <div class="field"><label>チャットモデル</label>
+        <div class="field"><label>AIモデル</label>
           <select id="modelSelect">
-            <option value="gpt-4o-mini">gpt-4o-mini（軽量・低コスト）</option>
-            <option value="gpt-4o">gpt-4o（高品質）</option>
+            <option value="gemini-2.5-flash-lite">gemini-2.5-flash-lite（軽量・上限ゆるめ・推奨）</option>
+            <option value="gemini-2.5-flash">gemini-2.5-flash（高品質・上限きつめ）</option>
+            <option value="gemini-2.0-flash">gemini-2.0-flash（別枠のフォールバック）</option>
           </select>
+        </div>
+        <hr style="border:none;border-top:1px solid var(--line);margin:22px 0">
+        <div class="field"><label>データのバックアップ</label>
+          <div class="seg">
+            <button onclick="exportData()">⬇ 書き出し</button>
+            <button onclick="document.getElementById('importFile').click()">⬆ 読み込み</button>
+          </div>
+          <input type="file" id="importFile" accept="application/json,.json" style="display:none" onchange="importData(this)">
+          <div class="note">しおり・ハイライト・メモ・レビュー・気になるを1つのファイルに保存／復元します（端末やURLの引っ越しにも）。APIキーは含まれません。</div>
         </div>
         <button class="btn-primary" onclick="commitSettings(this)">保存する</button>
       </div>
@@ -1390,7 +1843,7 @@ function segInit(id, val){
 function commitSettings(btn){
   settings.theme = document.querySelector("#segTheme .on").dataset.v;
   settings.size = parseInt(document.getElementById("sizeRange").value,10);
-  settings.openaiKey = document.getElementById("keyInput").value;
+  settings.geminiKey = document.getElementById("keyInput").value;
   settings.chatModel = document.getElementById("modelSelect").value;
   saveSettings();
   if(!document.getElementById("reader").classList.contains("hidden")){
@@ -1400,6 +1853,165 @@ function commitSettings(btn){
   setTimeout(()=> btn.closest(".scrim").remove(), 600);
 }
 
+/* ---------- データのバックアップ ---------- */
+function exportData(){
+  const data = { app:"shiori", version:1, date:new Date().toISOString(),
+    settings:{ theme:settings.theme, size:settings.size }, shelf: shelf };
+  const blob = new Blob([JSON.stringify(data,null,1)], {type:"application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = "shiori-backup-"+isoNow()+".json";
+  document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+}
+function importData(input){
+  const file = input.files && input.files[0]; if(!file) return;
+  const reader = new FileReader();
+  reader.onload = ()=>{
+    try{
+      const data = JSON.parse(reader.result);
+      const incoming = data.shelf || (data.app? {} : data);   // shelf直か、丸ごとか
+      if(!incoming || typeof incoming!=="object") throw new Error("形式が違います");
+      let n=0;
+      for(const id in incoming){
+        const src = incoming[id]; if(!src||typeof src!=="object") continue; n++;
+        const dst = shelf[id] || (shelf[id]={fraction:0});
+        if(typeof src.fraction==="number") dst.fraction = Math.max(dst.fraction||0, src.fraction);
+        if(src.updated) dst.updated = src.updated;
+        if(src.rating!=null){ dst.rating=src.rating; dst.review=src.review||""; dst.reviewDate=src.reviewDate||isoNow(); }
+        if(src.checked) dst.checked = true;
+        if(Array.isArray(src.highlights) && src.highlights.length){
+          dst.highlights = dst.highlights || [];
+          const seen = new Set(dst.highlights.map(h=>h.hid));
+          src.highlights.forEach(h=>{ if(h && h.hid && !seen.has(h.hid)){ dst.highlights.push(h); seen.add(h.hid); } });
+        }
+      }
+      saveShelf();
+      if(data.settings && data.settings.theme){ /* テーマは任意適用しない（現状維持） */ }
+      alert(n+" 作品ぶんの記録を読み込みました。");
+      renderLibrary();
+    }catch(e){ alert("読み込みに失敗しました：" + e.message); }
+    input.value = "";
+  };
+  reader.readAsText(file);
+}
+
+/* ---------- 読書統計 ---------- */
+function fmtHours(min){ if(min<60) return min+"分"; const h=Math.floor(min/60), m=min%60; return h+"時間"+(m?m+"分":""); }
+/* ---------- 使い方・ヘルプ ---------- */
+function openHelp(){
+  var scrim=document.createElement("div"); scrim.className="scrim center";
+  scrim.onclick=function(e){ if(e.target===scrim) scrim.remove(); };
+  scrim.innerHTML=
+    '<div class="modal" onclick="event.stopPropagation()">'+
+      '<div class="dhead"><h3>❓ 使い方</h3><button class="icon-btn close" onclick="this.closest(\'.scrim\').remove()">閉じる</button></div>'+
+      '<div class="dbody help">'+
+        '<p>青空文庫の名作を<b>“理解しながら読む”</b>ためのアプリです。<b>すべて無料</b>で使えます（AIとの対話には無料のGeminiキーが必要・クレカ不要）。</p>'+
+
+        '<h4>📖 読む</h4>'+
+        '<ul>'+
+          '<li>棚で<b>作品をタップ</b>すると開きます。</li>'+
+          '<li>ページをめくる：<b>画面の左寄りをタップ＝次へ</b>／右寄り＝前へ。<b>スワイプ</b>や矢印キーでも。</li>'+
+          '<li>読んだ位置は<b>自動でしおり保存</b>。次に開くと続きから。下のバーに現在位置(%)。</li>'+
+          '<li>文字サイズ・テーマ（和紙/白/夜）は<kbd>⚙️ 設定</kbd>で変更。</li>'+
+        '</ul>'+
+
+        '<h4>ふ ふりがな</h4>'+
+        '<ul><li>読書画面の<kbd>ふ</kbd>ボタンで、難しい漢字にふりがなを付けます（もう一度で解除）。</li></ul>'+
+
+        '<h4>📚 調べる・💬 AIに聞く</h4>'+
+        '<ul>'+
+          '<li>本文を<b>なぞって選択</b>すると、メニューが出ます：<b>🖍ハイライト／📝メモ／💬AIに聞く／📖辞書</b>。</li>'+
+          '<li>辞書は無料（Wiktionary・Wikipedia）。AIは作品全体にも質問でき、上部の<kbd>💬 AIに質問</kbd>から（テーマ／あらすじ／テスト対策 など）。</li>'+
+        '</ul>'+
+
+        '<h4>🖍 記録する</h4>'+
+        '<ul>'+
+          '<li><b>ハイライト</b>：引いた箇所を<b>タップ</b>すると、色変更・メモ・削除ができます。</li>'+
+          '<li><b>メモ</b>・一覧は上部の<kbd>🖍 ノート</kbd>。<b>名文コレクション</b>(<kbd>📑 名文集</kbd>)は全作品の引用を横断表示。</li>'+
+          '<li><b>レビュー</b>(<kbd>📝</kbd>)で★と感想、<b>気になる</b>(<kbd>🔖</kbd>)であとで読む登録。</li>'+
+        '</ul>'+
+
+        '<h4>🧭 選ぶ</h4>'+
+        '<ul>'+
+          '<li>各作品に<b>難易度（●）</b>と<b>読了目安（分）</b>。並べ替え・「はじめての一冊」で選べます。</li>'+
+          '<li>棚の上に<b>次の一冊レコメンド</b>。<kbd>📊 統計</kbd>で読書の記録も見られます。</li>'+
+        '</ul>'+
+
+        '<h4>💾 便利機能</h4>'+
+        '<ul>'+
+          '<li><b>バックアップ</b>：<kbd>⚙️ 設定</kbd>でしおり・ハイライト等を書き出し／読み込み（端末の引っ越しに）。</li>'+
+          '<li><b>ホーム画面に追加</b>すると、アプリのように起動でき、<b>一度読んだ作品はオフラインでも</b>読めます。</li>'+
+        '</ul>'+
+
+        '<h4>🤖 AIを使うには</h4>'+
+        '<p>AIとの対話は、<kbd>⚙️ 設定</kbd>で<b>Geminiの無料APIキー</b>を入れると使えます（クレカ不要）。<a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a> でGoogleログイン→「Create API key」。キーは<b>この端末内だけ</b>に保存され、外部には送られません。</p>'+
+
+        '<div class="tip">💡 まずは「はじめての一冊」から一作開いて、わからない言葉をなぞって「📖辞書」を試してみてください。</div>'+
+      '</div>'+
+    '</div>';
+  document.body.appendChild(scrim);
+}
+
+function openStats(){
+  const m=id=>META[id]||{min:0};
+  let done=0, reading=0, hiCount=0, reviews=0, ratingSum=0, minutes=0, doneThisYear=0;
+  const authorCount={}, thisYear=String(new Date().getFullYear());
+  WORKS.forEach(w=>{
+    const st=statusOf(w.id), r=shelf[w.id];
+    if(st==="done"){ done++; minutes+=m(w.id).min; authorCount[w.author]=(authorCount[w.author]||0)+1;
+      const d=(r&&(r.reviewDate||r.updated))||""; if(d.slice(0,4)===thisYear) doneThisYear++; }
+    else if(st==="reading") reading++;
+    if(r){ if(r.rating){ reviews++; ratingSum+=r.rating; }
+      if(Array.isArray(r.highlights)) r.highlights.forEach(h=>{ if(h.text) hiCount++; }); }
+  });
+  const avg = reviews? (ratingSum/reviews).toFixed(1) : "—";
+  const authors=Object.entries(authorCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const maxA=authors.length?authors[0][1]:1;
+  const bars=authors.map(([a,c])=>`<div class="auth-bar"><span class="name">${a}</span><span class="track"><span class="fill" style="width:${Math.round(c/maxA*100)}%"></span></span><span class="cnt">${c}</span></div>`).join("")
+    || `<div class="note">読了した作品が増えると、ここに作者別が出ます。</div>`;
+  const scrim=document.createElement("div"); scrim.className="scrim center"; scrim.onclick=(e)=>{ if(e.target===scrim) scrim.remove(); };
+  scrim.innerHTML=`
+    <div class="modal" onclick="event.stopPropagation()">
+      <div class="dhead"><h3>📊 読書統計</h3><button class="icon-btn close" onclick="this.closest('.scrim').remove()">閉じる</button></div>
+      <div class="dbody">
+        <div class="stat-grid">
+          <div class="stat-tile"><div class="num">${done}<small> / ${WORKS.length}</small></div><div class="lbl">読了した作品</div></div>
+          <div class="stat-tile"><div class="num">${fmtHours(minutes)}</div><div class="lbl">読んだ目安時間</div></div>
+          <div class="stat-tile"><div class="num">${doneThisYear}</div><div class="lbl">${thisYear}年の読了</div></div>
+          <div class="stat-tile"><div class="num">${reading}</div><div class="lbl">読書中</div></div>
+          <div class="stat-tile"><div class="num">${hiCount}</div><div class="lbl">ハイライト</div></div>
+          <div class="stat-tile"><div class="num">★${avg}</div><div class="lbl">平均評価（${reviews}件）</div></div>
+        </div>
+        <div class="stat-head">作者別 読了数</div>
+        ${bars}
+      </div>
+    </div>`;
+  document.body.appendChild(scrim);
+}
+
+/* ---------- 名文コレクション ---------- */
+function openCollection(){
+  const groups=[];
+  WORKS.forEach(w=>{ const r=shelf[w.id]; if(r&&Array.isArray(r.highlights)){ const hs=r.highlights.filter(h=>h.text); if(hs.length) groups.push({w, hs, last:(r.reviewDate||r.updated||"")}); } });
+  groups.sort((a,b)=> b.last.localeCompare(a.last));
+  const total=groups.reduce((s,g)=>s+g.hs.length,0);
+  let body;
+  if(!total){ body=`<div class="note">本文をなぞって「🖍 ハイライト」を引くと、心に残った一文がここに集まります。全作品を横断して読み返せます。</div>`; }
+  else body = groups.map(g=>{
+      const items=g.hs.slice().reverse().map(h=>`<div class="coll-quote">${escapeHtml(h.text)}</div>${h.note&&h.note.trim()?`<div class="coll-note">${escapeHtml(h.note)}</div>`:``}`).join("");
+      return `<div class="coll-work" data-wid="${g.w.id}">『${g.w.title}』 ${g.w.author} ›</div>${items}`;
+    }).join("");
+  const scrim=document.createElement("div"); scrim.className="scrim"; scrim.onclick=(e)=>{ if(e.target===scrim) scrim.remove(); };
+  scrim.innerHTML=`
+    <div class="drawer" onclick="event.stopPropagation()">
+      <div class="dhead"><h3>📑 名文コレクション${total?`（${total}）`:``}</h3><button class="icon-btn close" onclick="this.closest('.scrim').remove()">閉じる</button></div>
+      <div class="dbody">${body}</div>
+    </div>`;
+  document.body.appendChild(scrim);
+  scrim.querySelectorAll(".coll-work").forEach(el=> el.onclick=()=>{ const w=WORKS.find(x=>x.id===el.dataset.wid); scrim.remove(); if(w) openWork(w); });
+}
+
 /* ---------- utils ---------- */
 function escapeHtml(s){ return (s||"").replace(/[&<>]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;"}[c])); }
 function escapeAttr(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c])); }
@@ -1407,6 +2019,10 @@ function escapeAttr(s){ return (s||"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&
 /* ---------- boot ---------- */
 applyTheme();
 renderLibrary();
+/* PWA: Service Worker 登録（オフライン対応・インストール可能に） */
+if("serviceWorker" in navigator){
+  window.addEventListener("load", ()=>{ navigator.serviceWorker.register("./sw.js").catch(()=>{}); });
+}
 </script>
 </body>
 </html>
