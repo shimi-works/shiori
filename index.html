@@ -169,7 +169,7 @@
   .readbar .rtitle{font-size:13px; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:24vw}
   .progress{flex:1; height:26px; position:relative; cursor:pointer; touch-action:none; display:flex; align-items:center}
   .progress .ptrack{position:relative; width:100%; height:8px; background:var(--line); border-radius:6px; overflow:hidden}
-  .progress .bar{position:absolute; top:0; bottom:0; left:0; background:linear-gradient(90deg,var(--accent2),var(--accent)); border-radius:6px; width:0%}
+  .progress .bar{position:absolute; top:0; bottom:0; right:0; background:linear-gradient(90deg,var(--accent),var(--accent2)); border-radius:6px; width:0%}
   .progress .knob{position:absolute; top:50%; left:0%; width:18px; height:18px; margin-left:-9px; transform:translateY(-50%);
     background:var(--paper); border:2px solid var(--accent); border-radius:50%; box-shadow:0 2px 7px -2px rgba(0,0,0,.55); pointer-events:none; transition:left .1s ease}
   .progress:active .knob{transform:translateY(-50%) scale(1.15)}
@@ -380,8 +380,8 @@
 <!-- ========== READER ========== -->
 <div id="reader" class="view hidden">
   <div class="stage" id="stage">
-    <div class="page-turn pt-left" onclick="turn(-1)"><span class="edge-hint">‹</span></div>
-    <div class="page-turn pt-right" onclick="turn(1)"><span class="edge-hint">›</span></div>
+    <div class="page-turn pt-left" onclick="turn(1)"><span class="edge-hint">‹</span></div>
+    <div class="page-turn pt-right" onclick="turn(-1)"><span class="edge-hint">›</span></div>
     <div class="book" id="book"></div>
     <div class="loading-full hidden" id="readerLoading"><span class="spin"></span><span id="readerLoadingMsg">本を開いています…</span></div>
   </div>
@@ -1056,7 +1056,7 @@ function applyPage(animate=true){
   if(!animate) requestAnimationFrame(()=> book.style.transition = "");
   const frac = cur.pages>1 ? cur.page/(cur.pages-1) : 0;
   document.getElementById("progBar").style.width = (frac*100)+"%";
-  const knob=document.getElementById("progKnob"); if(knob) knob.style.left = (frac*100)+"%";
+  const knob=document.getElementById("progKnob"); if(knob) knob.style.left = ((1-frac)*100)+"%";   // 右=最初, 左へ進む（縦書き右→左に合わせる）
   document.getElementById("pageNo").textContent = `🔖 ${cur.page+1}/${cur.pages}・${Math.round(frac*100)}%`;
   if(cur.work){
     const r = rec(cur.work.id);
@@ -1159,7 +1159,7 @@ _stageEl.addEventListener("touchend",e=>{ if(e.touches.length===0){ if(pinchActi
 (function(){
   const pb=document.getElementById("progress"); if(!pb) return;
   let dragging=false;
-  const seekAt=x=>{ const box=pb.getBoundingClientRect(); goToFraction((x-box.left)/box.width, false); };
+  const seekAt=x=>{ const box=pb.getBoundingClientRect(); goToFraction((box.right-x)/box.width, false); };   // 右端=最初, 左へドラッグで前進
   pb.addEventListener("pointerdown",e=>{ dragging=true; try{pb.setPointerCapture(e.pointerId);}catch(_){}; seekAt(e.clientX); });
   pb.addEventListener("pointermove",e=>{ if(dragging) seekAt(e.clientX); });
   pb.addEventListener("pointerup",()=>{ dragging=false; });
