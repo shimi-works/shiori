@@ -141,9 +141,12 @@
     font-size:var(--reader-size); line-height:var(--reader-lh); color:var(--ink);
     transition:transform .38s cubic-bezier(.2,.7,.2,1);
     text-align:justify;
-    -webkit-touch-callout:none;                 /* iOS長押しの標準メニューを抑制（アプリ独自の選択メニューと衝突するため） */
-    -webkit-user-select:text; user-select:text; /* 選択自体は可能なまま */
+    -webkit-touch-callout:none;                 /* iOS長押しの標準メニューを抑制 */
+    -webkit-user-select:text; user-select:text; /* PCではドラッグ選択可 */
   }
+  /* タッチ端末では標準選択を無効化（iOS標準メニューを消し、長押し=一文選択の独自方式にする） */
+  @media (pointer:coarse){ .book{ -webkit-user-select:none; user-select:none; } }
+  .book mark.selpreview{ background:rgba(120,150,200,.4); color:inherit; border-radius:2px; }
   .book h1.title{font-size:1.5em; font-weight:600; margin:0 1.4em 0 0; letter-spacing:.08em}
   .book h2.author{font-size:.82em; color:var(--sub); margin:0 1.6em 0 0}
   .book .main_text{margin:0}
@@ -164,8 +167,12 @@
     display:flex; align-items:center; gap:16px; padding-left:20px; padding-right:20px;
     background:color-mix(in srgb,var(--paper) 92%, transparent); border-top:1px solid var(--line); backdrop-filter:blur(6px)}
   .readbar .rtitle{font-size:13px; color:var(--sub); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:24vw}
-  .progress{flex:1; height:8px; background:var(--line); border-radius:6px; position:relative; cursor:pointer; touch-action:none}
-  .progress .bar{position:absolute; top:0; bottom:0; right:0; background:linear-gradient(90deg,var(--accent2),var(--accent)); border-radius:6px; width:0%}
+  .progress{flex:1; height:26px; position:relative; cursor:pointer; touch-action:none; display:flex; align-items:center}
+  .progress .ptrack{position:relative; width:100%; height:8px; background:var(--line); border-radius:6px; overflow:hidden}
+  .progress .bar{position:absolute; top:0; bottom:0; left:0; background:linear-gradient(90deg,var(--accent2),var(--accent)); border-radius:6px; width:0%}
+  .progress .knob{position:absolute; top:50%; left:0%; width:18px; height:18px; margin-left:-9px; transform:translateY(-50%);
+    background:var(--paper); border:2px solid var(--accent); border-radius:50%; box-shadow:0 2px 7px -2px rgba(0,0,0,.55); pointer-events:none; transition:left .1s ease}
+  .progress:active .knob{transform:translateY(-50%) scale(1.15)}
   .pageno{font-size:12.5px; color:var(--ink); min-width:110px; text-align:center; font-variant-numeric:tabular-nums; font-weight:600}
 
   /* ---------- floating selection menu ---------- */
@@ -379,7 +386,7 @@
   </div>
   <div class="readbar">
     <span class="rtitle" id="readTitle"></span>
-    <div class="progress" id="progress"><div class="bar" id="progBar"></div></div>
+    <div class="progress" id="progress"><div class="ptrack"><div class="bar" id="progBar"></div></div><div class="knob" id="progKnob"></div></div>
     <span class="pageno" id="pageNo">— / —</span>
   </div>
   <div class="finish-toast hidden" id="finishToast">
@@ -1047,6 +1054,7 @@ function applyPage(animate=true){
   if(!animate) requestAnimationFrame(()=> book.style.transition = "");
   const frac = cur.pages>1 ? cur.page/(cur.pages-1) : 0;
   document.getElementById("progBar").style.width = (frac*100)+"%";
+  const knob=document.getElementById("progKnob"); if(knob) knob.style.left = (frac*100)+"%";
   document.getElementById("pageNo").textContent = `🔖 ${cur.page+1}/${cur.pages}・${Math.round(frac*100)}%`;
   if(cur.work){
     const r = rec(cur.work.id);
@@ -1159,7 +1167,9 @@ _stageEl.addEventListener("touchend",e=>{ if(e.touches.length===0){ if(pinchActi
 /* =========================================================
    TEXT SELECTION -> word explanation
    ========================================================= */
+let customSel=null;   // タッチの長押し一文選択 {text, fStart, fEnd, occurrence}（PCでは常にnull）
 document.addEventListener("selectionchange", ()=>{
+  if(customSel) return;                 // カスタム選択中はネイティブ選択に触らない
   const tip = document.getElementById("seltip");
   const sel = document.getSelection();
   const book = document.getElementById("book");
@@ -1171,7 +1181,80 @@ document.addEventListener("selectionchange", ()=>{
   tip.style.top = r.top+"px";
   tip.classList.remove("hidden");
 });
-function currentSelectionText(){ const s=document.getSelection(); return s? s.toString().trim():""; }
+function currentSelectionText(){ if(customSel) return customSel.text; const s=document.getSelection(); return s? s.toString().trim():""; }
+
+/* ---------- タッチ: 長押しで「一文」を選択（iOS標準メニューを使わない独自方式） ---------- */
+function clearCustomSel(){
+  customSel=null;
+  document.querySelectorAll("#book mark.selpreview").forEach(m=>{ const p=m.parentNode; if(!p) return; while(m.firstChild) p.insertBefore(m.firstChild,m); p.removeChild(m); p.normalize(); });
+}
+function caretFlatAt(x,y){
+  let node=null, offset=0;
+  if(document.caretRangeFromPoint){ const r=document.caretRangeFromPoint(x,y); if(r){ node=r.startContainer; offset=r.startOffset; } }
+  else if(document.caretPositionFromPoint){ const p=document.caretPositionFromPoint(x,y); if(p){ node=p.offsetNode; offset=p.offset; } }
+  if(!node) return null;
+  const book=document.getElementById("book"); if(!book.contains(node)) return null;
+  if(node.nodeType!==3) return null;
+  const flat=buildFlat(book);
+  for(const s of flat.segs){ if(s.node===node) return {flat, idx:s.start+Math.min(offset,s.len)}; }
+  return null;
+}
+function wrapSelPreview(flat, fStart, fEnd){
+  for(const s of flat.segs){
+    const segEnd=s.start+s.len;
+    if(segEnd<=fStart || s.start>=fEnd) continue;
+    const a=Math.max(fStart,s.start)-s.start, b=Math.min(fEnd,segEnd)-s.start;
+    if(b<=a) continue;
+    try{ const range=document.createRange(); range.setStart(s.node,a); range.setEnd(s.node,b);
+      const mark=document.createElement("mark"); mark.className="selpreview"; range.surroundContents(mark);
+    }catch(e){}
+  }
+}
+function selectSentenceAt(x,y){
+  const hit=caretFlatAt(x,y); if(!hit) return false;
+  const t=hit.flat.text, DELIM=/[。．！？!?…\n]/;
+  let s=hit.idx, e=hit.idx;
+  while(s>0 && !DELIM.test(t[s-1])) s--;
+  while(e<t.length && !DELIM.test(t[e])) e++;
+  if(e<t.length) e++;                        // 区切り文字も含める
+  while(s<e && /\s/.test(t[s])) s++;         // 前後の空白/改行を除去
+  while(e>s && /\s/.test(t[e-1])) e--;
+  const text=t.slice(s,e).trim();
+  if(!text) return false;
+  clearCustomSel();
+  const flat=buildFlat(document.getElementById("book"));   // clearでDOMが変わるため作り直す
+  let occ=0, from=0, idx; while((idx=flat.text.indexOf(text,from))>=0 && idx<s){ occ++; from=idx+1; }
+  customSel={text, fStart:s, fEnd:e, occurrence:occ};
+  wrapSelPreview(flat, s, e);
+  const m=document.querySelector("#book mark.selpreview");
+  const tip=document.getElementById("seltip");
+  if(m){ const r=m.getBoundingClientRect(); tip.style.left=(r.left+r.width/2)+"px"; tip.style.top=r.top+"px"; }
+  else { tip.style.left=x+"px"; tip.style.top=y+"px"; }
+  tip.classList.remove("hidden");
+  return true;
+}
+(function(){   // 長押し検出（タッチのみ）
+  const stage=document.getElementById("stage"); if(!stage) return;
+  let timer=null, sx=0, sy=0, longFired=false;
+  const cancel=()=>{ if(timer){ clearTimeout(timer); timer=null; } };
+  const isUI=t=> t && t.closest && t.closest(".page-turn, .readbar, #seltip, #hltip, mark.hl");
+  stage.addEventListener("touchstart",e=>{
+    longFired=false; cancel();
+    if(e.touches.length!==1 || isUI(e.target)) return;
+    const t=e.touches[0]; sx=t.clientX; sy=t.clientY;
+    timer=setTimeout(()=>{ timer=null; longFired=true; if(selectSentenceAt(sx,sy) && navigator.vibrate){ try{navigator.vibrate(8);}catch(_){} } }, 460);
+  },{passive:true});
+  stage.addEventListener("touchmove",e=>{
+    const t=e.touches[0]; if(!t) return;
+    if(Math.abs(t.clientX-sx)>10 || Math.abs(t.clientY-sy)>10) cancel();
+  },{passive:true});
+  stage.addEventListener("touchend",e=>{
+    cancel();
+    if(longFired){ longFired=false; return; }        // 長押しで選択済み
+    if(isUI(e.target)) return;                        // ボタン等は無視
+    if(customSel){ clearCustomSel(); hideSelTip(); }  // 何もない所をタップ→選択解除
+  },{passive:true});
+})();
 
 /* =========================================================
    EMOTION 演出
@@ -1539,7 +1622,7 @@ function lookupSelection(){
   openAI("dict");
   setTimeout(()=>{ const i=document.getElementById("dictInput"); if(i){ i.value=t; runDict(); } }, 60);
 }
-function hideSelTip(){ const t=document.getElementById("seltip"); if(t) t.classList.add("hidden"); }
+function hideSelTip(){ const t=document.getElementById("seltip"); if(t) t.classList.add("hidden"); clearCustomSel(); }
 
 /* =========================================================
    ハイライト / メモ
@@ -1598,6 +1681,7 @@ function renderHighlights(){
   });
 }
 function selectionInfo(){
+  if(customSel) return {text:customSel.text, occurrence:customSel.occurrence, fStart:customSel.fStart};
   const sel=document.getSelection(); if(!sel||sel.isCollapsed) return null;
   const text=sel.toString().trim(); if(!text) return null;
   const book=document.getElementById("book"); if(!book.contains(sel.anchorNode)) return null;
