@@ -791,6 +791,32 @@ let shelf = load("shiori.shelf", {});
 function load(k,def){ try{ return {...def, ...JSON.parse(localStorage.getItem(k)||"{}")}; }catch(e){ return {...def}; } }
 function save(k,v){ localStorage.setItem(k, JSON.stringify(v)); }
 function saveShelf(){ save("shiori.shelf", shelf); }
+
+/* ---------- 読書活動ログ（日数・実読書時間・連続日数を蓄積・保存） ---------- */
+let readLog = load("shiori.readlog", {days:{}});   // days: { "YYYY-MM-DD": 秒 }
+function saveReadLog(){ save("shiori.readlog", readLog); }
+let _readLast = Date.now();
+function readActive(){ return !document.hidden && !document.getElementById("reader").classList.contains("hidden"); }
+function readTick(){
+  const now = Date.now();
+  if(readActive() && _readLast){
+    const dt = (now-_readLast)/1000;
+    if(dt>0 && dt<90){ const k=isoNow(); readLog.days[k]=(readLog.days[k]||0)+dt; saveReadLog(); }
+  }
+  _readLast = now;
+}
+function readStats(){
+  const map = readLog.days||{};
+  const set = new Set(Object.keys(map).filter(d=>map[d]>0));
+  const totalSec = Object.values(map).reduce((a,b)=>a+(b||0),0);
+  const key = dt => dt.toISOString().slice(0,10);
+  let streak=0, d=new Date(); if(!set.has(key(d))) d.setDate(d.getDate()-1);
+  while(set.has(key(d))){ streak++; d.setDate(d.getDate()-1); }
+  return { totalMin: Math.round(totalSec/60), days: set.size, streak };
+}
+setInterval(readTick, 20000);   // 読書画面が見えている間だけ加算
+document.addEventListener("visibilitychange", ()=>{ readTick(); _readLast=Date.now(); });
+window.addEventListener("pagehide", ()=>{ readTick(); });
 function rec(id){ return shelf[id] || (shelf[id] = {fraction:0}); }
 // 旧 shiori.bookmarks からの移行
 (function migrateBookmarks(){
@@ -1010,6 +1036,7 @@ function deleteReview(id, btn){
   saveShelf(); btn.closest(".scrim").remove(); renderLibrary();
 }
 function showLibrary(){
+  readTick();   // 読書画面を離れる前に、この間の読書時間を記録
   document.getElementById("reader").classList.add("hidden");
   document.getElementById("library").classList.remove("hidden");
   document.getElementById("btn-ask").hidden = true;
@@ -1029,6 +1056,7 @@ function showLibrary(){
    ========================================================= */
 async function openWork(w){
   cur.work = w;
+  _readLast = Date.now();   // 読書時間の計測起点
   document.getElementById("library").classList.add("hidden");
   document.getElementById("reader").classList.remove("hidden");
   document.getElementById("btn-ask").hidden = false;
@@ -2065,7 +2093,7 @@ function openSettings(){
             <button onclick="document.getElementById('importFile').click()">⬆ 読み込み</button>
           </div>
           <input type="file" id="importFile" accept="application/json,.json" style="display:none" onchange="importData(this)">
-          <div class="note">しおり・ハイライト・メモ・レビュー・気になるを1つのファイルに保存／復元します（端末やURLの引っ越しにも）。APIキーは含まれません。</div>
+          <div class="note">しおり・ハイライト・メモ・レビュー・気になる・<b>読書統計（日数/時間/連続日数）</b>・テーマ設定を、1つのファイルに保存／復元します（端末やURLの引っ越し・機種変更にも）。定期的な書き出しをおすすめします。※APIキーは安全のため含まれません。</div>
         </div>
         <button class="btn-primary" onclick="commitSettings(this)">保存する</button>
       </div>
@@ -2104,8 +2132,10 @@ function commitSettings(btn){
 
 /* ---------- データのバックアップ ---------- */
 function exportData(){
-  const data = { app:"shiori", version:1, date:new Date().toISOString(),
-    settings:{ theme:settings.theme, size:settings.size }, shelf: shelf };
+  readTick();   // 直近の読書時間も書き出しに含める
+  const data = { app:"shiori", version:2, date:new Date().toISOString(),
+    settings:{ theme:settings.theme, size:settings.size, chatModel:settings.chatModel },
+    shelf: shelf, readlog: readLog };
   const blob = new Blob([JSON.stringify(data,null,1)], {type:"application/json"});
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -2136,7 +2166,20 @@ function importData(input){
         }
       }
       saveShelf();
-      if(data.settings && data.settings.theme){ /* テーマは任意適用しない（現状維持） */ }
+      // 設定（テーマ・文字サイズ・AIモデル）を復元
+      if(data.settings){
+        if(data.settings.theme) settings.theme = data.settings.theme;
+        if(typeof data.settings.size==="number") settings.size = data.settings.size;
+        if(data.settings.chatModel) settings.chatModel = data.settings.chatModel;
+        saveSettings();   // applyTheme込み
+        document.documentElement.style.setProperty("--reader-size", settings.size+"px");
+      }
+      // 読書活動ログ（日数・時間・連続日数）をマージ。日ごとに大きい方＝再読込での二重計上を防ぐ
+      if(data.readlog && data.readlog.days){
+        readLog.days = readLog.days || {};
+        for(const d in data.readlog.days){ readLog.days[d] = Math.max(readLog.days[d]||0, data.readlog.days[d]||0); }
+        saveReadLog();
+      }
       alert(n+" 作品ぶんの記録を読み込みました。");
       renderLibrary();
     }catch(e){ alert("読み込みに失敗しました：" + e.message); }
@@ -2216,6 +2259,7 @@ function openStats(){
       if(Array.isArray(r.highlights)) r.highlights.forEach(h=>{ if(h.text) hiCount++; }); }
   });
   const avg = reviews? (ratingSum/reviews).toFixed(1) : "—";
+  const rs = readStats();
   const authors=Object.entries(authorCount).sort((a,b)=>b[1]-a[1]).slice(0,6);
   const maxA=authors.length?authors[0][1]:1;
   const bars=authors.map(([a,c])=>`<div class="auth-bar"><span class="name">${a}</span><span class="track"><span class="fill" style="width:${Math.round(c/maxA*100)}%"></span></span><span class="cnt">${c}</span></div>`).join("")
@@ -2227,11 +2271,14 @@ function openStats(){
       <div class="dbody">
         <div class="stat-grid">
           <div class="stat-tile"><div class="num">${done}<small> / ${WORKS.length}</small></div><div class="lbl">読了した作品</div></div>
-          <div class="stat-tile"><div class="num">${fmtHours(minutes)}</div><div class="lbl">読んだ目安時間</div></div>
+          <div class="stat-tile"><div class="num">${fmtHours(rs.totalMin)}</div><div class="lbl">実際の読書時間</div></div>
+          <div class="stat-tile"><div class="num">🔥 ${rs.streak}<small> 日</small></div><div class="lbl">連続読書日数</div></div>
+          <div class="stat-tile"><div class="num">${rs.days}<small> 日</small></div><div class="lbl">読書した日数</div></div>
           <div class="stat-tile"><div class="num">${doneThisYear}</div><div class="lbl">${thisYear}年の読了</div></div>
           <div class="stat-tile"><div class="num">${reading}</div><div class="lbl">読書中</div></div>
           <div class="stat-tile"><div class="num">${hiCount}</div><div class="lbl">ハイライト</div></div>
           <div class="stat-tile"><div class="num">★${avg}</div><div class="lbl">平均評価（${reviews}件）</div></div>
+          <div class="stat-tile"><div class="num">${fmtHours(minutes)}</div><div class="lbl">読了ぶんの目安時間</div></div>
         </div>
         <div class="stat-head">作者別 読了数</div>
         ${bars}
