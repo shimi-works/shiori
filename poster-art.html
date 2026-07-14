@@ -1,0 +1,181 @@
+<style>
+  .shiori-stage{
+    --paper:#e7dcc4; --paper-deep:#dccdac; --paper-edge:#cbb98f;
+    --ink:#24201a; --ink-soft:rgba(36,32,26,.62); --ink-faint:rgba(36,32,26,.10);
+    --gold1:#7c5c22; --gold2:#c8a24c; --gold3:#efd591; --gold-line:#b3893c;
+    --vermilion:#a5372a;
+    --mincho:"Yu Mincho","YuMincho","Hiragino Mincho ProN","Hiragino Mincho Pro","Shippori Mincho","Noto Serif JP","MS PMincho",serif;
+    --serif:"Optima","Palatino Linotype",Georgia,"Times New Roman",serif;
+    --sans:"Helvetica Neue","Hiragino Sans","Yu Gothic",Arial,sans-serif;
+    min-height:100%; display:flex; align-items:center; justify-content:center;
+    padding:28px 16px; box-sizing:border-box;
+    background:
+      radial-gradient(120% 90% at 50% -10%, #cfc09c 0%, #b7a67f 55%, #97855f 100%);
+    font-family:var(--mincho);
+  }
+  @media (prefers-reduced-motion: no-preference){
+    .shiori-poster{ animation:posterIn 1.1s cubic-bezier(.2,.7,.2,1) both; }
+    .shiori-poster .logo{ animation:sealIn 1.3s .25s cubic-bezier(.2,.8,.2,1) both; }
+  }
+  @keyframes posterIn{ from{opacity:0; transform:translateY(14px) scale(.985)} to{opacity:1; transform:none} }
+  @keyframes sealIn{ from{opacity:0; transform:translateY(10px) scale(.9)} to{opacity:1; transform:none} }
+
+  .shiori-poster{
+    position:relative; width:min(90vw, 600px); aspect-ratio:1 / 1.414;
+    container-type:size; overflow:hidden; isolation:isolate;
+    background:
+      linear-gradient(150deg, var(--paper) 0%, var(--paper-deep) 62%, var(--paper-edge) 100%);
+    box-shadow:0 30px 70px -30px rgba(40,28,10,.75), 0 4px 14px -6px rgba(40,28,10,.4);
+    color:var(--ink);
+  }
+  .shiori-poster .grain{ position:absolute; inset:0; z-index:1; pointer-events:none; }
+  /* 背景に羅生門の冒頭を淡く敷く */
+  .shiori-poster .bgtext{
+    position:absolute; inset:6cqw 5cqw; z-index:1; pointer-events:none; overflow:hidden;
+    writing-mode:vertical-rl; font-size:5.4cqw; line-height:1.9; letter-spacing:.06em;
+    color:var(--ink-faint); font-family:var(--mincho); user-select:none;
+  }
+  .shiori-poster .frame{ position:absolute; inset:3.4cqw; z-index:6; pointer-events:none;
+    border:1px solid var(--gold-line); }
+  .shiori-poster .frame::after{ content:""; position:absolute; inset:1.1cqw;
+    border:1px solid color-mix(in srgb, var(--gold-line) 45%, transparent); }
+
+  .shiori-poster .content{
+    position:absolute; inset:0; z-index:5; display:grid;
+    grid-template-rows:auto 1fr auto auto auto; gap:2.4cqw;
+    padding:8.5cqw 8cqw 7cqw;
+  }
+
+  .eyebrow{ display:flex; align-items:center; gap:2.2cqw; font-family:var(--sans);
+    font-size:2.35cqw; letter-spacing:.42em; text-indent:.42em; color:var(--ink-soft);
+    text-transform:uppercase; }
+  .eyebrow .dot{ width:1.2cqw; height:1.2cqw; border-radius:50%;
+    background:linear-gradient(135deg,var(--gold3),var(--gold1)); box-shadow:0 0 0 .3cqw color-mix(in srgb,var(--gold2) 30%,transparent); }
+  .eyebrow .rule{ flex:1; height:1px; background:linear-gradient(90deg,var(--gold-line),transparent); }
+
+  .hero{ display:flex; align-items:center; justify-content:space-between; gap:3cqw; min-height:0; }
+  .logo{
+    font-family:var(--mincho); font-weight:600; line-height:.86; font-size:52cqw;
+    background:linear-gradient(155deg, var(--gold1) 4%, var(--gold3) 42%, #fff5d8 52%, var(--gold2) 60%, var(--gold1) 96%);
+    -webkit-background-clip:text; background-clip:text; color:transparent;
+    -webkit-text-fill-color:transparent;
+    filter:drop-shadow(0 .6cqw 1cqw rgba(60,40,8,.28));
+    margin-left:-1cqw;
+  }
+  .tagline{
+    writing-mode:vertical-rl; align-self:center; font-family:var(--mincho);
+    font-size:6.6cqw; line-height:1.62; letter-spacing:.16em; color:var(--ink);
+    font-weight:500; text-shadow:0 1px 0 rgba(255,250,235,.35);
+  }
+  .tagline b{ font-weight:600; color:#6f4f18; }
+
+  .identity{ display:flex; align-items:baseline; gap:3cqw; padding-top:2cqw;
+    border-top:1px solid var(--gold-line); }
+  .identity .romaji{ font-family:var(--serif); font-size:6.2cqw; letter-spacing:.5em;
+    text-indent:.5em; color:var(--ink); font-weight:600; }
+  .identity .reading{ font-family:var(--mincho); font-size:3.1cqw; letter-spacing:.24em;
+    color:var(--ink-soft); }
+
+  .features{ list-style:none; margin:0; padding:0; display:grid; gap:1.55cqw; }
+  .features li{ position:relative; padding-left:4.6cqw; font-family:var(--mincho);
+    font-size:3.05cqw; letter-spacing:.05em; color:var(--ink); line-height:1.35; }
+  .features li::before{ content:"栞"; position:absolute; left:0; top:.05em;
+    font-size:2.7cqw; color:var(--vermilion); opacity:.9; }
+  .features b{ font-weight:600; color:#6f4f18; }
+
+  .footer{ display:flex; align-items:center; justify-content:space-between; gap:2cqw;
+    margin-top:1cqw; }
+  .footer .url{ font-family:var(--sans); font-size:2.5cqw; letter-spacing:.14em;
+    color:var(--ink-soft); }
+  .seal{
+    display:grid; place-items:center; width:11cqw; height:11cqw; flex:0 0 auto;
+    background:linear-gradient(145deg,#b54435,#a5372a);
+    color:#f7ede0; font-family:var(--mincho); font-weight:600; font-size:6.2cqw;
+    border-radius:1.4cqw; transform:rotate(-4deg);
+    box-shadow:inset 0 0 0 .5cqw rgba(255,240,225,.35), 0 1cqw 2cqw -1cqw rgba(120,30,20,.6);
+    letter-spacing:0;
+  }
+
+  .shiori-caption{ margin-top:16px; font-family:var(--sans); font-size:12.5px;
+    color:#4b4030; letter-spacing:.04em; text-align:center; opacity:.85; }
+  @media (prefers-color-scheme:dark){ .shiori-caption{ color:#c9bd9f; } }
+  :root[data-theme="dark"] .shiori-caption{ color:#c9bd9f; }
+  :root[data-theme="light"] .shiori-caption{ color:#4b4030; }
+</style>
+
+<div class="shiori-stage">
+  <div>
+    <div class="shiori-poster" role="img"
+         aria-label="栞 SHIORI — AI文豪コンシェルジュ。青空文庫の名作131作品を、縦書き・ルビ・辞書・AIの読解アシストで読む読書アプリの宣伝ポスター。">
+      <canvas class="grain" aria-hidden="true"></canvas>
+      <div class="bgtext" aria-hidden="true">ある日の暮方の事である。一人の下人が、羅生門の下で雨やみを待っていた。広い門の下には、この男のほかに誰もいない。ただ、所々丹塗の剥げた、大きな円柱に、蟋蟀が一匹とまっている。</div>
+
+      <div class="content">
+        <div class="eyebrow"><span class="dot"></span>青空文庫 × 人工知能<span class="rule"></span>BUNGO&nbsp;CONCIERGE</div>
+
+        <div class="hero">
+          <div class="logo">栞</div>
+          <div class="tagline">百年の名作を、<br>今日(きょう)の心で読む。</div>
+        </div>
+
+        <div class="identity">
+          <span class="romaji">SHIORI</span>
+          <span class="reading">— AI文豪コンシェルジュ</span>
+        </div>
+
+        <ul class="features">
+          <li>青空文庫の名作 <b>131作品</b> を収録</li>
+          <li>縦書き・ルビ・外字に対応した読書体験</li>
+          <li>難しい漢字はふりがな、語句はその場で辞書</li>
+          <li>AIの読解アシスト＋しおり・レビュー</li>
+        </ul>
+
+        <div class="footer">
+          <span class="url">shimi-works.github.io/shiori</span>
+          <span class="seal">栞</span>
+        </div>
+      </div>
+
+      <div class="frame"></div>
+    </div>
+    <div class="shiori-caption">＊ 背景は芥川龍之介『羅生門』冒頭より</div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const poster = document.querySelector('.shiori-poster');
+  const cv = poster.querySelector('.grain');
+  const ctx = cv.getContext('2d');
+  function draw(){
+    const r = poster.getBoundingClientRect();
+    const dpr = Math.min(window.devicePixelRatio||1, 2);
+    const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+    cv.width = w*dpr; cv.height = h*dpr; cv.style.width=w+'px'; cv.style.height=h+'px';
+    ctx.setTransform(dpr,0,0,dpr,0,0);
+    ctx.clearRect(0,0,w,h);
+    // 和紙の繊維（淡い斑点）
+    for(let i=0;i<Math.round(w*h/900);i++){
+      const x=Math.random()*w, y=Math.random()*h, a=Math.random()*0.05;
+      ctx.fillStyle = Math.random()<0.5 ? `rgba(80,60,30,${a})` : `rgba(255,250,235,${a*1.4})`;
+      ctx.fillRect(x,y,Math.random()*1.6+.3,Math.random()*1.6+.3);
+    }
+    // 金砂子（上部ほど密）
+    const flecks = Math.round(w*h/2600);
+    for(let i=0;i<flecks;i++){
+      const x=Math.random()*w;
+      const bias=Math.pow(Math.random(),1.7);         // 上に寄せる
+      const y=bias*h*0.55 + (Math.random()<0.25?Math.random()*h:0);
+      const s=Math.random()*1.7+0.4;
+      const g=ctx.createLinearGradient(x,y,x+s,y+s);
+      g.addColorStop(0,'rgba(240,210,120,0.9)'); g.addColorStop(1,'rgba(150,110,40,0.7)');
+      ctx.fillStyle=g; ctx.globalAlpha=0.35+Math.random()*0.5;
+      ctx.beginPath(); ctx.arc(x,y,s,0,Math.PI*2); ctx.fill();
+    }
+    ctx.globalAlpha=1;
+  }
+  draw();
+  let t; window.addEventListener('resize',()=>{ clearTimeout(t); t=setTimeout(draw,120); });
+  if(document.fonts && document.fonts.ready) document.fonts.ready.then(draw);
+})();
+</script>

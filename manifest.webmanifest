@@ -1,0 +1,17 @@
+{
+  "name": "栞 — AI文豪コンシェルジュ",
+  "short_name": "栞",
+  "description": "青空文庫の名作を、縦書き・ルビ・辞書・AIの読解アシストで読む読書アプリ。",
+  "lang": "ja",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#e7dcc4",
+  "theme_color": "#9a4b3f",
+  "icons": [
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
