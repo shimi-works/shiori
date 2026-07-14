@@ -183,7 +183,9 @@
   #seltip button span,#hltip button span{font-size:11.5px; letter-spacing:.03em}
   #seltip button:hover,#hltip button:hover{background:rgba(255,255,255,.16)}
   #hltip button.del span{color:#ff9b8a}
-  #seltip::after,#hltip::after{content:""; position:absolute; left:50%; bottom:-5px; transform:translateX(-50%) rotate(45deg); width:10px; height:10px; background:var(--ink)}
+  #seltip::after,#hltip::after{content:""; position:absolute; left:var(--ax,50%); bottom:-5px; transform:translateX(-50%) rotate(45deg); width:10px; height:10px; background:var(--ink)}
+  #seltip.below,#hltip.below{transform:translate(-50%,14px)}
+  #seltip.below::after,#hltip.below::after{bottom:auto; top:-5px}
 
   /* ---------- highlights (本文中のマーカー) ---------- */
   .book mark.hl{ background:rgba(224,166,61,.42); color:inherit; border-radius:2px; cursor:pointer; }
@@ -268,6 +270,9 @@
   .dhead h3{margin:0; font-size:16px; font-weight:600; letter-spacing:.04em}
   .dhead .close{margin-left:auto}
   .dbody{padding:18px 20px; overflow:auto; flex:1}
+  /* full-height drawers must clear the iOS status bar / home indicator */
+  .drawer .dhead{padding-top:calc(18px + env(safe-area-inset-top))}
+  .drawer .dbody{padding-bottom:calc(18px + env(safe-area-inset-bottom))}
   .field{margin-bottom:18px}
   .field label{display:block; font-size:12.5px; color:var(--sub); margin-bottom:7px; letter-spacing:.03em}
   .field input[type=text],.field input[type=password],.field select{
@@ -1298,6 +1303,20 @@ _stageEl.addEventListener("touchend",e=>{ if(e.touches.length===0){ if(pinchActi
    TEXT SELECTION -> word explanation
    ========================================================= */
 let customSel=null;   // タッチの長押し一文選択 {text, fStart, fEnd, occurrence}（PCでは常にnull）
+// 画面端でメニューが見切れないよう水平位置をクランプし、上に収まらなければ下へ回す
+function placeTip(tip, cx, topY, botY){
+  tip.classList.remove("hidden","below");
+  const vw=window.innerWidth, m=8, gap=6;
+  const rect=tip.getBoundingClientRect();
+  const w=rect.width, h=rect.height;
+  const left=Math.max(m+w/2, Math.min(cx, vw-m-w/2));
+  let top=topY;
+  if(topY - h - gap < m){ tip.classList.add("below"); top=botY; }   // 上に入らなければ選択の下へ
+  tip.style.left=left+"px";
+  tip.style.top=top+"px";
+  const ax=Math.max(12, Math.min(w-12, cx-left+w/2));               // 矢印は実際の選択中心を指す
+  tip.style.setProperty("--ax", ax+"px");
+}
 document.addEventListener("selectionchange", ()=>{
   if(customSel) return;                 // カスタム選択中はネイティブ選択に触らない
   const tip = document.getElementById("seltip");
@@ -1307,9 +1326,7 @@ document.addEventListener("selectionchange", ()=>{
   const text = sel.toString().trim();
   if(!text || text.length>300 || !book.contains(sel.anchorNode)){ tip.classList.add("hidden"); return; }
   const r = sel.getRangeAt(0).getBoundingClientRect();
-  tip.style.left = (r.left + r.width/2)+"px";
-  tip.style.top = r.top+"px";
-  tip.classList.remove("hidden");
+  placeTip(tip, r.left + r.width/2, r.top, r.bottom);
 });
 function currentSelectionText(){ if(customSel) return customSel.text; const s=document.getSelection(); return s? s.toString().trim():""; }
 
@@ -1318,13 +1335,29 @@ function clearCustomSel(){
   customSel=null;
   document.querySelectorAll("#book mark.selpreview").forEach(m=>{ const p=m.parentNode; if(!p) return; while(m.firstChild) p.insertBefore(m.firstChild,m); p.removeChild(m); p.normalize(); });
 }
+// rt/rp（ふりがな）内か判定
+function inRubyAnnotation(node, book){
+  let p=node ? (node.nodeType===3?node.parentNode:node) : null;
+  while(p && p!==book){ if(p.nodeName==="RT"||p.nodeName==="RP") return true; p=p.parentNode; }
+  return false;
+}
+// ふりがな/要素に当たったとき、その字の基底テキスト（ruby直下のテキスト）へ寄せる
+function baseTextNodeNear(node, book){
+  let p=node ? (node.nodeType===3?node.parentNode:node) : null;
+  while(p && p!==book && p.nodeName!=="RUBY"){ if(!p.parentNode) break; p=p.parentNode; }
+  if(p && p.nodeName==="RUBY"){ for(const c of p.childNodes){ if(c.nodeType===3 && c.nodeValue) return c; } }
+  return null;
+}
 function caretFlatAt(x,y){
   let node=null, offset=0;
   if(document.caretRangeFromPoint){ const r=document.caretRangeFromPoint(x,y); if(r){ node=r.startContainer; offset=r.startOffset; } }
   else if(document.caretPositionFromPoint){ const p=document.caretPositionFromPoint(x,y); if(p){ node=p.offsetNode; offset=p.offset; } }
   if(!node) return null;
   const book=document.getElementById("book"); if(!book.contains(node)) return null;
-  if(node.nodeType!==3) return null;
+  if(node.nodeType!==3 || inRubyAnnotation(node, book)){   // ふりがな/要素に当たっても空振りさせない
+    const base=baseTextNodeNear(node, book); if(!base) return null;
+    node=base; offset=0;
+  }
   const flat=buildFlat(book);
   for(const s of flat.segs){ if(s.node===node) return {flat, idx:s.start+Math.min(offset,s.len)}; }
   return null;
@@ -1371,11 +1404,12 @@ function showSelMenu(){
   const marks=document.querySelectorAll("#book mark.selpreview");
   const tip=document.getElementById("seltip");
   if(marks.length){
-    let L=Infinity,R=-Infinity,T=Infinity;
-    marks.forEach(m=>{ const r=m.getBoundingClientRect(); L=Math.min(L,r.left); R=Math.max(R,r.right); T=Math.min(T,r.top); });
-    tip.style.left=((L+R)/2)+"px"; tip.style.top=T+"px";
+    let L=Infinity,R=-Infinity,T=Infinity,B=-Infinity;
+    marks.forEach(m=>{ const r=m.getBoundingClientRect(); L=Math.min(L,r.left); R=Math.max(R,r.right); T=Math.min(T,r.top); B=Math.max(B,r.bottom); });
+    placeTip(tip, (L+R)/2, T, B);
+  } else {
+    tip.classList.remove("hidden");
   }
-  tip.classList.remove("hidden");
 }
 (function(){   // タッチ: 長押しで語を選択→そのままドラッグで範囲調整（iOS標準選択は使わない）
   const stage=document.getElementById("stage"); if(!stage) return;
@@ -1401,7 +1435,7 @@ function showSelMenu(){
     cancel(); selecting=false;
     if(e.touches.length!==1 || isUI(e.target)) return;
     const t=e.touches[0]; sx=t.clientX; sy=t.clientY;
-    timer=setTimeout(()=>{ timer=null; beginSelect(sx,sy); }, 420);
+    timer=setTimeout(()=>{ timer=null; beginSelect(sx,sy); }, 340);
   },{passive:true});
   stage.addEventListener("touchmove",e=>{
     if(selecting){
@@ -1412,7 +1446,7 @@ function showSelMenu(){
       return;
     }
     const t=e.touches[0]; if(!t) return;
-    if(Math.abs(t.clientX-sx)>10 || Math.abs(t.clientY-sy)>10) cancel();   // 長押し確定前に動いたら中止
+    if(Math.abs(t.clientX-sx)>13 || Math.abs(t.clientY-sy)>13) cancel();   // 長押し確定前に動いたら中止
   },{passive:false});
   stage.addEventListener("touchend",e=>{
     cancel();
@@ -1919,8 +1953,7 @@ let curHlId=null;
 function showHlTip(hid, e){
   hideSelTip(); curHlId=hid;
   const tip=document.getElementById("hltip");
-  tip.style.left=e.clientX+"px"; tip.style.top=(e.clientY-4)+"px";
-  tip.classList.remove("hidden");
+  placeTip(tip, e.clientX, e.clientY-4, e.clientY+4);
 }
 function hideHlTip(){ const t=document.getElementById("hltip"); if(t) t.classList.add("hidden"); curHlId=null; }
 function hlMemo(){ const id=curHlId; hideHlTip(); if(id) openNotes(id); }
